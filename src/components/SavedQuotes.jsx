@@ -1,4 +1,4 @@
-import { Eye, Plus, Search, Trash2 } from 'lucide-react'
+import { CircleDollarSign, Clock3, Eye, FileText, Plus, Search, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import StatusBadge from './StatusBadge.jsx'
 import {
@@ -36,17 +36,55 @@ export default function SavedQuotes({
     })
   }, [query, quotes, statusFilter])
 
+  const quoteStats = useMemo(() => {
+    const totalValue = quotes.reduce((sum, quote) => sum + calculateQuote(quote).total, 0)
+    const activeCount = quotes.filter((quote) => quote.status !== 'Rejected').length
+    const pendingCount = quotes.filter((quote) => quote.status === 'Pending').length
+
+    return {
+      activeCount,
+      pendingCount,
+      totalValue,
+    }
+  }, [quotes])
+
   return (
     <section className="saved-page" aria-labelledby="saved-heading">
       <div className="page-heading">
         <div>
           <p className="section-label">Saved quotations</p>
-          <h1 id="saved-heading">Saved quotes and status updates.</h1>
+          <h1 id="saved-heading">Saved quotations</h1>
+          <p className="page-subtitle">
+            Track every sent quote, follow up on pending work, and reopen details fast.
+          </p>
         </div>
         <button className="button primary" type="button" onClick={onCreate}>
           <Plus aria-hidden="true" />
           New quotation
         </button>
+      </div>
+
+      <div className="page-insight-grid saved-insights" aria-label="Quotation summary">
+        <article className="insight-card">
+          <FileText aria-hidden="true" />
+          <span>Total quotes</span>
+          <strong>{quotes.length}</strong>
+        </article>
+        <article className="insight-card accent">
+          <CircleDollarSign aria-hidden="true" />
+          <span>Total quoted</span>
+          <strong>{peso(quoteStats.totalValue)}</strong>
+        </article>
+        <article className="insight-card amber">
+          <Clock3 aria-hidden="true" />
+          <span>Pending follow-ups</span>
+          <strong>{quoteStats.pendingCount}</strong>
+        </article>
+        <article className="insight-card mint">
+          <Eye aria-hidden="true" />
+          <span>Active records</span>
+          <strong>{quoteStats.activeCount}</strong>
+        </article>
       </div>
 
       <div className="saved-toolbar">
@@ -104,11 +142,11 @@ export default function SavedQuotes({
                     </td>
                     <td>
                       <span className="quote-title">
-                        {quote.clientName || 'No client yet'}
+                        {quote.clientName || 'Client missing'}
                       </span>
                       <span className="quote-meta">{quote.clientEmail}</span>
                     </td>
-                    <td>{quote.projectName || 'No project yet'}</td>
+                    <td>{quote.projectName || 'Project missing'}</td>
                     <td>
                       <strong>{peso(calculateQuote(quote).total)}</strong>
                     </td>
@@ -162,8 +200,8 @@ export default function SavedQuotes({
                     <StatusBadge status={quote.status} />
                   </div>
                   <div className="quote-card-body">
-                    <span className="quote-title">{quote.clientName || 'No client yet'}</span>
-                    <span className="quote-meta">{quote.projectName || 'No project yet'}</span>
+                    <span className="quote-title">{quote.clientName || 'Client missing'}</span>
+                    <span className="quote-meta">{quote.projectName || 'Project missing'}</span>
                     <strong className="quote-card-total">
                       {peso(calculateQuote(quote).total)}
                     </strong>
@@ -196,8 +234,14 @@ export default function SavedQuotes({
             </div>
           </>
         ) : (
-          <div className="empty-state">
-            No quotes match these filters.
+          <div className="empty-state elevated-empty">
+            <FileText aria-hidden="true" />
+            <strong>No quotations found</strong>
+            <p>
+              {quotes.length
+                ? 'Try a different search or status filter.'
+                : 'Create your first quotation and it will appear here.'}
+            </p>
           </div>
         )}
       </article>

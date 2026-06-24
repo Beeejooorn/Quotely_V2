@@ -87,7 +87,7 @@ function getCalendarCells(monthDate, quotes) {
       isCurrentMonth: date.getMonth() === monthDate.getMonth(),
       quotes: quotes
         .filter((quote) => quote.status !== 'Rejected' && quote.validityDate === isoDate)
-        .slice(0, 2),
+        .sort((a, b) => calculateQuote(b).total - calculateQuote(a).total),
     }
   })
 }
@@ -111,7 +111,7 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
         <div>
           <p className="section-label">Dashboard</p>
           <h1 id="dashboard-heading">Dashboard</h1>
-          <p className="page-subtitle">Quote activity and follow-ups for today.</p>
+          <p className="page-subtitle">Open quotes, follow-ups, and validity dates.</p>
         </div>
         <button className="button primary" type="button" onClick={onCreate}>
           <FilePenLine aria-hidden="true" />
@@ -121,7 +121,7 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
 
       <div className="summary-grid" aria-label="Quotation summary">
         <StatCard icon={FileText} label="Total quotations" note="Saved quotes" tone="blue" value={quotes.length} />
-        <StatCard icon={Clock3} label="Awaiting reply" note="Waiting for response" tone="coral" value={stats.counts.Pending} />
+        <StatCard icon={Clock3} label="Awaiting reply" note="Waiting for response" tone="amber" value={stats.counts.Pending} />
         <StatCard
           icon={CheckCircle2}
           label="Approved value"
@@ -129,7 +129,7 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
           tone="green"
           value={peso(stats.approvedValue)}
         />
-        <StatCard icon={Users} label="Active clients" note="With saved quotes" tone="violet" value={stats.activeClients} />
+        <StatCard icon={Users} label="Active clients" note="With saved quotes" tone="mint" value={stats.activeClients} />
       </div>
 
       <div className="dashboard-main-grid">
@@ -153,8 +153,8 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
                       <span className="activity-type">Quotation</span>
                       <span className="quote-id-chip compact">{quote.quotationNumber}</span>
                     </span>
-                    <strong>{quote.clientName || 'No client yet'}</strong>
-                    <small>{quote.projectName || 'No project yet'}</small>
+                    <strong>{quote.clientName || 'Client missing'}</strong>
+                    <small>{quote.projectName || 'Project missing'}</small>
                   </span>
                   <span className="activity-side">
                     <strong>{peso(calculateQuote(quote).total)}</strong>
@@ -183,7 +183,7 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
               followUpQuotes.map((quote) => (
                 <button className="attention-row" key={quote.id} type="button" onClick={() => onView(quote)}>
                   <span>
-                    <strong>{quote.clientName || 'No client yet'}</strong>
+                    <strong>{quote.clientName || 'Client missing'}</strong>
                     <small>
                       <span className="quote-id-chip compact">{quote.quotationNumber}</span>
                       <span>Valid until {formatDate(quote.validityDate)}</span>
@@ -244,14 +244,29 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
                 type="button"
                 onClick={() => cell.quotes[0] && onView(cell.quotes[0])}
               >
-                <span className="calendar-date">{cell.date.getDate()}</span>
+                <span className="calendar-date-row">
+                  <span className="calendar-date">{cell.date.getDate()}</span>
+                  {cell.quotes.length ? (
+                    <span className="calendar-count">{cell.quotes.length}</span>
+                  ) : null}
+                </span>
                 <span className="calendar-deadlines">
-                  {cell.quotes.map((quote) => (
+                  {cell.quotes.slice(0, 2).map((quote) => (
                     <span className="calendar-quote" key={quote.id}>
-                      <span className="quote-id-chip compact">{quote.quotationNumber}</span>
-                      <span>{quote.clientName || 'No client yet'}</span>
+                      <span className="calendar-quote-top">
+                        <span className="quote-id-chip compact">{quote.quotationNumber}</span>
+                        <span className={`calendar-status-dot status-${quote.status.toLowerCase()}`} />
+                      </span>
+                      <span className="calendar-client">{quote.clientName || 'Client missing'}</span>
+                      <span className="calendar-amount">{peso(calculateQuote(quote).total)}</span>
                     </span>
                   ))}
+                  {cell.quotes.length > 2 ? (
+                    <span className="calendar-more">+{cell.quotes.length - 2} more</span>
+                  ) : null}
+                  {!cell.quotes.length && cell.isCurrentMonth ? (
+                    <span className="calendar-empty-note">No deadline</span>
+                  ) : null}
                 </span>
               </button>
             ))}

@@ -1,10 +1,47 @@
-import { LogOut, ShieldCheck, UserRound } from 'lucide-react'
+import { ImagePlus, LogOut, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 
-export default function Profile({ account, onLogout }) {
+const maxProfileImageSize = 1024 * 1024
+
+export default function Profile({
+  account,
+  onFeedback,
+  onLogout,
+  onProfileImageChange,
+  onProfileImageRemove,
+  profileImage,
+}) {
   const profileName =
     account?.user_metadata?.full_name ||
     account?.user_metadata?.name ||
     'Workspace owner'
+  const uploadedProfileImage = profileImage && !profileImage.startsWith('preset:')
+
+  const handleProfileImage = (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+
+    if (!file) {
+      return
+    }
+
+    if (!file.type.startsWith('image/')) {
+      onFeedback?.('Image file required', 'Choose a PNG, JPG, or other image file.', 'error')
+      return
+    }
+
+    if (file.size > maxProfileImageSize) {
+      onFeedback?.('Image is too large', 'Choose an image under 1 MB.', 'error')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string') {
+        onProfileImageChange(reader.result)
+      }
+    })
+    reader.readAsDataURL(file)
+  }
 
   return (
     <section className="profile-page" aria-labelledby="profile-heading">
@@ -22,12 +59,38 @@ export default function Profile({ account, onLogout }) {
 
       <div className="profile-grid">
         <article className="profile-card panel">
-          <span className="profile-avatar" aria-hidden="true">
-            <UserRound />
-          </span>
-          <div>
-            <h2>{profileName}</h2>
-            <p>{account?.email}</p>
+          <div className="profile-identity-row">
+            <span className="profile-avatar" aria-hidden="true">
+              {uploadedProfileImage ? (
+                <img alt="" src={profileImage} />
+              ) : (
+                <UserRound />
+              )}
+            </span>
+            <div>
+              <h2>{profileName}</h2>
+              <p>{account?.email}</p>
+            </div>
+          </div>
+          <div className="profile-avatar-stack">
+            <div className="profile-image-actions">
+              <label className="button secondary profile-image-button">
+                <ImagePlus aria-hidden="true" />
+                Choose image
+                <input accept="image/*" type="file" onChange={handleProfileImage} />
+              </label>
+              {uploadedProfileImage && (
+                <button
+                  className="icon-button danger"
+                  type="button"
+                  title="Remove profile image"
+                  onClick={onProfileImageRemove}
+                >
+                  <Trash2 aria-hidden="true" />
+                </button>
+              )}
+            </div>
+            <small>Upload a PNG/JPG up to 1 MB.</small>
           </div>
         </article>
 
@@ -42,8 +105,7 @@ export default function Profile({ account, onLogout }) {
           <div className="profile-security-body">
             <strong>Signed in</strong>
             <p>
-              Supabase Auth manages this session. Quotation data should move behind Supabase row-level
-              security before production launch.
+              Supabase Auth manages this session. Keep this account signed out on shared devices.
             </p>
           </div>
         </article>

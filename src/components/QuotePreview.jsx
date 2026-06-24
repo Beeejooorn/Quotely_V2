@@ -1,5 +1,6 @@
 import { Download, Printer } from 'lucide-react'
 import StatusBadge from './StatusBadge.jsx'
+import LogoMark from './LogoMark.jsx'
 import { formatDate, peso, splitLines, visibleAddOns } from '../utils/quotation.js'
 
 export default function QuotePreview({ onDownload, onPrint, quote, settings, totals }) {
@@ -29,7 +30,7 @@ export default function QuotePreview({ onDownload, onPrint, quote, settings, tot
         <header className="document-header">
           <div className="document-brand">
             <span className="brand-mark" aria-hidden="true">
-              Q
+              <LogoMark />
             </span>
             <div>
               <h2>{settings.businessName || 'Quotely'}</h2>
@@ -52,14 +53,14 @@ export default function QuotePreview({ onDownload, onPrint, quote, settings, tot
           <div className="document-details">
             <div className="detail-block">
               <span>Client</span>
-              <strong>{quote.clientName || 'Client name'}</strong>
-              <p>{quote.clientEmail || 'client@email.com'}</p>
+              <strong>{quote.clientName || 'Client missing'}</strong>
+              <p>{quote.clientEmail || 'Email missing'}</p>
             </div>
             <div className="detail-block">
               <span>Project</span>
-              <strong>{quote.projectName || 'Project or event name'}</strong>
+              <strong>{quote.projectName || 'Project missing'}</strong>
               <p>
-                {formatDate(quote.eventDate)} | {quote.location || 'Location'}
+                {formatDate(quote.eventDate)} | {quote.location || 'Location missing'}
               </p>
             </div>
           </div>
@@ -71,7 +72,7 @@ export default function QuotePreview({ onDownload, onPrint, quote, settings, tot
             {services.length ? (
               services.map((service) => <li key={service}>{service}</li>)
             ) : (
-              <li>Services to be confirmed</li>
+              <li>Add included services before saving.</li>
             )}
           </ul>
         </section>
@@ -118,7 +119,7 @@ export default function QuotePreview({ onDownload, onPrint, quote, settings, tot
         <footer className="document-footer">
           <div>
             <h3>Payment terms</h3>
-            <p>{quote.paymentTerms || 'Payment terms to be confirmed.'}</p>
+            <p>{quote.paymentTerms || 'Payment terms missing.'}</p>
           </div>
           <div>
             <h3>Notes and validity</h3>

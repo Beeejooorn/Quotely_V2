@@ -1,11 +1,14 @@
 import { LogIn, Mail, LockKeyhole } from 'lucide-react'
 import { useState } from 'react'
+import LogoMark from './LogoMark.jsx'
 
 export default function AuthScreen({
   error,
+  fieldErrors = {},
   isConfigured,
   message,
   onEmailAuth,
+  onFieldChange,
   onSocialLogin,
   socialProviders = {},
 }) {
@@ -32,10 +35,14 @@ export default function AuthScreen({
 
   const updateField = (field, value) => {
     setForm((currentForm) => ({ ...currentForm, [field]: value }))
+    onFieldChange?.(field)
   }
 
   const toggleMode = () => {
     setMode(isSignUp ? 'login' : 'signup')
+    onFieldChange?.('name')
+    onFieldChange?.('email')
+    onFieldChange?.('password')
   }
 
   const submitForm = async (event) => {
@@ -48,7 +55,7 @@ export default function AuthScreen({
       <section className="auth-panel">
         <div className="auth-mark-row">
           <span className="brand-mark" aria-hidden="true">
-            Q
+            <LogoMark />
           </span>
         </div>
 
@@ -67,11 +74,14 @@ export default function AuthScreen({
             <label className="field">
               <span>Name</span>
               <input
+                aria-invalid={Boolean(fieldErrors.name)}
+                className={fieldErrors.name ? 'is-invalid' : undefined}
                 autoComplete="name"
                 value={form.name}
                 onChange={(event) => updateField('name', event.target.value)}
                 placeholder="Workspace owner"
               />
+              {fieldErrors.name && <small className="field-error">{fieldErrors.name}</small>}
             </label>
           )}
 
@@ -80,6 +90,8 @@ export default function AuthScreen({
             <span className="auth-input-wrap">
               <Mail aria-hidden="true" />
               <input
+                aria-invalid={Boolean(fieldErrors.email)}
+                className={fieldErrors.email ? 'is-invalid' : undefined}
                 autoComplete="email"
                 type="email"
                 value={form.email}
@@ -87,6 +99,7 @@ export default function AuthScreen({
                 placeholder="Email address"
               />
             </span>
+            {fieldErrors.email && <small className="field-error">{fieldErrors.email}</small>}
           </label>
 
           <label className="field">
@@ -94,6 +107,8 @@ export default function AuthScreen({
             <span className="auth-input-wrap">
               <LockKeyhole aria-hidden="true" />
               <input
+                aria-invalid={Boolean(fieldErrors.password)}
+                className={fieldErrors.password ? 'is-invalid' : undefined}
                 autoComplete={isSignUp ? 'new-password' : 'current-password'}
                 type="password"
                 value={form.password}
@@ -101,6 +116,7 @@ export default function AuthScreen({
                 placeholder={isSignUp ? 'Create password' : 'Password'}
               />
             </span>
+            {fieldErrors.password && <small className="field-error">{fieldErrors.password}</small>}
           </label>
 
           {formError && <p className="auth-error">{formError}</p>}

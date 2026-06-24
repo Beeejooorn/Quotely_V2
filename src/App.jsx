@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import AppShell from './components/AppShell.jsx'
 import AuthScreen from './components/AuthScreen.jsx'
 import BrandSettings from './components/BrandSettings.jsx'
@@ -7,6 +7,8 @@ import Profile from './components/Profile.jsx'
 import QuoteBuilder from './components/QuoteBuilder.jsx'
 import QuotePreview from './components/QuotePreview.jsx'
 import SavedQuotes from './components/SavedQuotes.jsx'
+import ServiceLibrary from './components/ServiceLibrary.jsx'
+import LogoMark from './components/LogoMark.jsx'
 import { defaultSettings, initialQuotes } from './data/seedQuotes.js'
 import {
   isSupabaseConfigured,
@@ -20,6 +22,7 @@ import {
   downloadQuotationHtml,
   nextQuoteNumber,
   normalizeMoney,
+  splitLines,
 } from './utils/quotation.js'
 import './App.css'
 
@@ -28,6 +31,8 @@ const LEGACY_STORAGE_KEYS = {
   'brand-settings': 'quotely-brand-settings',
   quotes: 'quotely-quotes',
 }
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function getStorageKey(key) {
   return `quotely:${key}:${STORAGE_VERSION}`
@@ -39,6 +44,10 @@ function readStoredValue(key, fallback) {
       window.localStorage.getItem(getStorageKey(key)) ||
       window.localStorage.getItem(LEGACY_STORAGE_KEYS[key])
     const parsedValue = storedValue ? JSON.parse(storedValue) : fallback
+
+    if (key === 'quotes' && Array.isArray(parsedValue)) {
+      return parsedValue.filter((quote) => !String(quote.id || '').startsWith('seed-'))
+    }
 
     if (key === 'brand-settings' && parsedValue.accentColor === '#0f9f82') {
       return { ...parsedValue, accentColor: fallback.accentColor }
@@ -72,6 +81,68 @@ function createId() {
   return `quote-${Date.now()}`
 }
 
+function isValidEmail(value) {
+  return emailPattern.test(String(value || '').trim())
+}
+
+function normalizeServiceTemplate(template) {
+  return {
+    id: template.id || createId(),
+    name: String(template.name || '').trim(),
+    description: String(template.description || '').trim(),
+    price: normalizeMoney(template.price),
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+function validateQuoteDraft(quote) {
+  const errors = {}
+
+  if (!quote.clientName.trim()) {
+    errors.clientName = 'Add the client name.'
+  }
+
+  if (!quote.clientEmail.trim()) {
+    errors.clientEmail = 'Add the client email.'
+  } else if (!isValidEmail(quote.clientEmail)) {
+    errors.clientEmail = 'Use a valid email address.'
+  }
+
+  if (!quote.projectName.trim()) {
+    errors.projectName = 'Add the project or event name.'
+  }
+
+  if (!quote.eventDate) {
+    errors.eventDate = 'Choose the project date.'
+  }
+
+  if (!quote.location.trim()) {
+    errors.location = 'Add the location.'
+  }
+
+  if (!quote.packageType.trim()) {
+    errors.packageType = 'Add a package or service name.'
+  }
+
+  if (normalizeMoney(quote.basePrice) <= 0) {
+    errors.basePrice = 'Add a package price greater than zero.'
+  }
+
+  if (!splitLines(quote.servicesIncluded).length) {
+    errors.servicesIncluded = 'Add at least one included service.'
+  }
+
+  if (!quote.validityDate) {
+    errors.validityDate = 'Choose a validity date.'
+  }
+
+  if (!quote.paymentTerms.trim()) {
+    errors.paymentTerms = 'Add payment terms.'
+  }
+
+  return errors
+}
+
 function normalizeDraftForSave(draft, existingId, quotes) {
   const visibleAddOns = draft.addOns.filter(
     (item) => item.name.trim() || normalizeMoney(item.price) > 0,
@@ -89,14 +160,33 @@ function normalizeDraftForSave(draft, existingId, quotes) {
   }
 }
 
-function SecureWorkspace({ account, onLogout }) {
+function ToastViewport({ toast }) {
+  if (!toast) {
+    return null
+  }
+
+  return (
+    <div className="toast-viewport" aria-live="polite" aria-atomic="true">
+      <div className={`app-toast ${toast.type}`}>
+        <strong>{toast.title}</strong>
+        {toast.message && <span>{toast.message}</span>}
+      </div>
+    </div>
+  )
+}
+
+function SecureWorkspace({ account, onLogout, showFeedback }) {
   const [quotes, setQuotes] = usePersistedState('quotes', initialQuotes)
   const [settings, setSettings] = usePersistedState(
     'brand-settings',
     defaultSettings,
   )
+  const [serviceTemplates, setServiceTemplates] = usePersistedState('service-templates', [])
+  const [profileImage, setProfileImage] = usePersistedState('profile-image', '')
   const [activeSection, setActiveSection] = useState('dashboard')
   const [selectedQuoteId, setSelectedQuoteId] = useState(null)
+  const [quoteErrors, setQuoteErrors] = useState({})
+  const settingsFeedbackRef = useRef(null)
   const [draftQuote, setDraftQuote] = useState(() =>
     createBlankQuote(nextQuoteNumber(quotes)),
   )
@@ -104,14 +194,62 @@ function SecureWorkspace({ account, onLogout }) {
   const draftTotals = useMemo(() => calculateQuote(draftQuote), [draftQuote])
   const isEditing = Boolean(selectedQuoteId)
 
-  const startNewQuote = (nextQuotes = quotes) => {
+  const clearQuoteErrors = (fields) => {
+    setQuoteErrors((currentErrors) => {
+      const nextErrors = { ...currentErrors }
+
+      fields.forEach((field) => {
+        delete nextErrors[field]
+      })
+
+      return nextErrors
+    })
+  }
+
+  const updateDraftQuote = (nextQuote, changedFields = []) => {
+    setDraftQuote(nextQuote)
+
+    if (changedFields.length) {
+      clearQuoteErrors(changedFields)
+    }
+  }
+
+  useEffect(
+    () => () => {
+      if (settingsFeedbackRef.current) {
+        window.clearTimeout(settingsFeedbackRef.current)
+      }
+    },
+    [],
+  )
+
+  const startNewQuote = (nextQuotes = quotes, shouldNotify = true) => {
     setSelectedQuoteId(null)
     setDraftQuote(createBlankQuote(nextQuoteNumber(nextQuotes)))
+    setQuoteErrors({})
     setActiveSection('create')
+
+    if (shouldNotify) {
+      showFeedback('New draft started', 'Fill in the quotation details when ready.')
+    }
   }
 
   const saveQuote = () => {
+    const validationErrors = validateQuoteDraft(draftQuote)
+
+    if (Object.keys(validationErrors).length) {
+      setQuoteErrors(validationErrors)
+      setActiveSection('create')
+      showFeedback(
+        'Quotation needs details',
+        Object.values(validationErrors)[0],
+        'error',
+      )
+      return
+    }
+
     const savedQuote = normalizeDraftForSave(draftQuote, selectedQuoteId, quotes)
+    const wasEditing = Boolean(selectedQuoteId)
 
     setQuotes((currentQuotes) => {
       const exists = currentQuotes.some((quote) => quote.id === savedQuote.id)
@@ -127,7 +265,12 @@ function SecureWorkspace({ account, onLogout }) {
 
     setSelectedQuoteId(savedQuote.id)
     setDraftQuote(savedQuote)
+    setQuoteErrors({})
     setActiveSection('saved')
+    showFeedback(
+      wasEditing ? 'Quotation updated' : 'Quotation saved',
+      `${savedQuote.quotationNumber} is now in Saved Quotations.`,
+    )
   }
 
   const viewQuote = (quote) => {
@@ -140,6 +283,7 @@ function SecureWorkspace({ account, onLogout }) {
   }
 
   const deleteQuote = (quoteId) => {
+    const deletedQuote = quotes.find((quote) => quote.id === quoteId)
     const nextQuotes = quotes.filter((quote) => quote.id !== quoteId)
     setQuotes(nextQuotes)
 
@@ -147,9 +291,18 @@ function SecureWorkspace({ account, onLogout }) {
       setSelectedQuoteId(null)
       setDraftQuote(createBlankQuote(nextQuoteNumber(nextQuotes)))
     }
+
+    showFeedback(
+      'Quotation deleted',
+      deletedQuote?.quotationNumber
+        ? `${deletedQuote.quotationNumber} was removed.`
+        : 'The quotation was removed.',
+    )
   }
 
   const updateQuoteStatus = (quoteId, status) => {
+    const updatedQuote = quotes.find((quote) => quote.id === quoteId)
+
     setQuotes((currentQuotes) =>
       currentQuotes.map((quote) =>
         quote.id === quoteId
@@ -161,11 +314,125 @@ function SecureWorkspace({ account, onLogout }) {
     if (quoteId === selectedQuoteId) {
       setDraftQuote((currentDraft) => ({ ...currentDraft, status }))
     }
+
+    showFeedback(
+      'Status updated',
+      `${updatedQuote?.quotationNumber || 'Quotation'} moved to ${status}.`,
+    )
+  }
+
+  const updateSettings = (nextSettings) => {
+    setSettings(nextSettings)
+    if (settingsFeedbackRef.current) {
+      window.clearTimeout(settingsFeedbackRef.current)
+    }
+
+    settingsFeedbackRef.current = window.setTimeout(() => {
+      showFeedback('Brand settings saved', 'Quotation previews now use the latest details.')
+    }, 650)
+  }
+
+  const downloadQuote = () => {
+    downloadQuotationHtml(draftQuote, settings)
+    showFeedback('Download prepared', `${draftQuote.quotationNumber} was downloaded as HTML.`)
+  }
+
+  const printQuote = () => {
+    showFeedback('Print dialog opening', 'Use your browser print options to finish.')
+    window.print()
+  }
+
+  const saveServiceTemplate = (template) => {
+    const nextTemplate = normalizeServiceTemplate(template)
+
+    if (!nextTemplate.name) {
+      showFeedback('Service name required', 'Add a name before saving this service.', 'error')
+      return false
+    }
+
+    if (nextTemplate.price <= 0) {
+      showFeedback('Service price required', 'Add a price greater than zero.', 'error')
+      return false
+    }
+
+    if (!splitLines(nextTemplate.description).length) {
+      showFeedback(
+        'Service details required',
+        'Add at least one included service line.',
+        'error',
+      )
+      return false
+    }
+
+    setServiceTemplates((currentTemplates) => {
+      const exists = currentTemplates.some((item) => item.id === nextTemplate.id)
+
+      if (exists) {
+        return currentTemplates.map((item) =>
+          item.id === nextTemplate.id ? nextTemplate : item,
+        )
+      }
+
+      return [nextTemplate, ...currentTemplates]
+    })
+
+    showFeedback('Service saved', `${nextTemplate.name} is ready for quotations.`)
+    return true
+  }
+
+  const deleteServiceTemplate = (templateId) => {
+    const deletedTemplate = serviceTemplates.find((item) => item.id === templateId)
+
+    setServiceTemplates((currentTemplates) =>
+      currentTemplates.filter((item) => item.id !== templateId),
+    )
+    showFeedback(
+      'Service deleted',
+      deletedTemplate?.name ? `${deletedTemplate.name} was removed.` : 'The service was removed.',
+    )
+  }
+
+  const applyServiceTemplate = (templateId) => {
+    const selectedTemplate = serviceTemplates.find((item) => item.id === templateId)
+
+    if (!selectedTemplate) {
+      return
+    }
+
+    updateDraftQuote(
+      {
+        ...draftQuote,
+        packageType: selectedTemplate.name,
+        basePrice: selectedTemplate.price,
+        servicesIncluded: selectedTemplate.description,
+      },
+      ['packageType', 'basePrice', 'servicesIncluded'],
+    )
+    showFeedback('Service applied', `${selectedTemplate.name} was added to this quote.`)
+  }
+
+  const updateProfileImage = (imageDataUrl) => {
+    setProfileImage(imageDataUrl)
+    showFeedback('Profile photo updated', 'Your workspace profile now uses this image.')
+  }
+
+  const removeProfileImage = () => {
+    setProfileImage('')
+    showFeedback('Profile photo removed', 'Your profile now uses the default mark.')
   }
 
   const renderSection = () => {
     if (activeSection === 'profile') {
-      return <Profile account={account} onLogout={onLogout} />
+      return (
+        <Profile
+          account={account}
+          onFeedback={showFeedback}
+          onLogout={onLogout}
+          onProfileImageChange={updateProfileImage}
+          onProfileImageRemove={removeProfileImage}
+          profileImage={profileImage}
+        />
+      )
     }
 
     if (activeSection === 'saved') {
@@ -180,11 +447,21 @@ function SecureWorkspace({ account, onLogout }) {
       )
     }
 
+    if (activeSection === 'services') {
+      return (
+        <ServiceLibrary
+          onDelete={deleteServiceTemplate}
+          onSave={saveServiceTemplate}
+          services={serviceTemplates}
+        />
+      )
+    }
+
     if (activeSection === 'settings') {
       return (
         <BrandSettings
           settings={settings}
-          onChange={setSettings}
+          onChange={updateSettings}
           quote={draftQuote}
           totals={draftTotals}
         />
@@ -219,17 +496,20 @@ function SecureWorkspace({ account, onLogout }) {
             <QuoteBuilder
               quote={draftQuote}
               totals={draftTotals}
-              onChange={setDraftQuote}
+              errors={quoteErrors}
+              onApplyService={applyServiceTemplate}
+              onChange={updateDraftQuote}
               onNew={() => startNewQuote()}
               onSave={saveQuote}
               isEditing={isEditing}
+              serviceTemplates={serviceTemplates}
             />
             <QuotePreview
               quote={draftQuote}
               settings={settings}
               totals={draftTotals}
-              onDownload={() => downloadQuotationHtml(draftQuote, settings)}
-              onPrint={() => window.print()}
+              onDownload={downloadQuote}
+              onPrint={printQuote}
             />
           </div>
         </section>
@@ -252,7 +532,7 @@ function SecureWorkspace({ account, onLogout }) {
       onNavigate={setActiveSection}
       accentColor={settings.accentColor}
       account={account}
-      onLogout={onLogout}
+      profileImage={profileImage}
     >
       {renderSection()}
     </AppShell>
@@ -263,11 +543,34 @@ function App() {
   const [session, setSession] = useState(null)
   const [isAuthLoading, setIsAuthLoading] = useState(isSupabaseConfigured)
   const [authError, setAuthError] = useState('')
+  const [authFieldErrors, setAuthFieldErrors] = useState({})
   const [authMessage, setAuthMessage] = useState('')
+  const [toast, setToast] = useState(null)
+  const toastTimeoutRef = useRef(null)
   const [socialProviders, setSocialProviders] = useState({
     google: null,
     x: null,
   })
+
+  const showFeedback = (title, message = '', type = 'success') => {
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current)
+    }
+
+    setToast({ message, title, type })
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToast(null)
+    }, 3200)
+  }
+
+  useEffect(
+    () => () => {
+      if (toastTimeoutRef.current) {
+        window.clearTimeout(toastTimeoutRef.current)
+      }
+    },
+    [],
+  )
 
   useEffect(() => {
     if (!supabase) {
@@ -285,6 +588,7 @@ function App() {
 
       if (error) {
         setAuthError(error.message)
+        showFeedback('Session check failed', error.message, 'error')
       }
 
       setSession(data.session)
@@ -293,10 +597,15 @@ function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession)
       setAuthError('')
+      setAuthFieldErrors({})
       setAuthMessage('')
+
+      if (event === 'SIGNED_IN') {
+        showFeedback('Signed in', 'Your Quotely workspace is ready.')
+      }
     })
 
     return () => {
@@ -352,26 +661,39 @@ function App() {
   const handleEmailAuth = async ({ email, mode, name, password }) => {
     if (!supabase) {
       setAuthError('Add Supabase environment variables to enable live sign-in.')
+      showFeedback('Live sign-in is not ready', 'Add the Supabase environment variables.', 'error')
       return
     }
 
     const trimmedEmail = email.trim().toLowerCase()
     const trimmedName = name.trim()
+    const fieldErrors = {}
 
-    if (!trimmedEmail || !password) {
-      setAuthError('Enter your email and password.')
-      return
+    if (!trimmedEmail) {
+      fieldErrors.email = 'Enter your email address.'
+    } else if (!isValidEmail(trimmedEmail)) {
+      fieldErrors.email = 'Use a valid email address.'
+    }
+
+    if (!password) {
+      fieldErrors.password = 'Enter your password.'
+    } else if (password.length < 8) {
+      fieldErrors.password = 'Use at least 8 characters.'
     }
 
     if (mode === 'signup' && !trimmedName) {
-      setAuthError('Enter your name.')
+      fieldErrors.name = 'Enter your name.'
+    }
+
+    if (Object.keys(fieldErrors).length) {
+      const firstError = Object.values(fieldErrors)[0]
+      setAuthFieldErrors(fieldErrors)
+      setAuthError(firstError)
+      showFeedback('Check the sign-in form', firstError, 'error')
       return
     }
 
-    if (password.length < 8) {
-      setAuthError('Use at least 8 characters for your password.')
-      return
-    }
+    setAuthFieldErrors({})
 
     const response =
       mode === 'signup'
@@ -389,15 +711,20 @@ function App() {
 
     if (response.error) {
       setAuthError(response.error.message)
+      showFeedback('Authentication failed', response.error.message, 'error')
       return
     }
 
     setAuthError('')
+    setAuthFieldErrors({})
     setAuthMessage(
       mode === 'signup' && !response.data.session
         ? 'Check your email to confirm your account.'
         : '',
     )
+    if (mode === 'signup' && !response.data.session) {
+      showFeedback('Account created', 'Check your email to confirm your account.')
+    }
   }
 
   const logout = async () => {
@@ -407,11 +734,15 @@ function App() {
 
     setSession(null)
     setAuthError('')
+    setAuthFieldErrors({})
+    setAuthMessage('You have been logged out.')
+    showFeedback('Logged out', 'Your Quotely session has ended.')
   }
 
   const handleSocialLogin = async (provider) => {
     if (!supabase) {
       setAuthError('Add Supabase environment variables to enable live sign-in.')
+      showFeedback('Live sign-in is not ready', 'Add the Supabase environment variables.', 'error')
       return
     }
 
@@ -421,8 +752,15 @@ function App() {
       setAuthError(
         `${providerName} sign-in is not enabled in Supabase yet. Enable it under Authentication > Sign In / Providers.`,
       )
+      showFeedback(
+        `${providerName} sign-in unavailable`,
+        'Enable the provider in Supabase Auth settings first.',
+        'error',
+      )
       return
     }
+
+    showFeedback(`Opening ${providerName}`, 'Complete the secure sign-in in your browser.')
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
@@ -433,41 +771,63 @@ function App() {
 
     if (error) {
       setAuthError(error.message)
+      showFeedback(`${providerName} sign-in failed`, error.message, 'error')
     }
   }
 
   if (isAuthLoading) {
     return (
-      <main className="auth-page" aria-label="Loading Quotely">
-        <section className="auth-panel">
-          <div className="auth-mark-row">
-            <span className="brand-mark" aria-hidden="true">
-              Q
-            </span>
-          </div>
-          <div className="auth-copy">
-            <h1>Opening Quotely</h1>
-            <p>Checking your sign-in session.</p>
-          </div>
-        </section>
-      </main>
+      <>
+        <main className="auth-page" aria-label="Loading Quotely">
+          <section className="auth-panel">
+            <div className="auth-mark-row">
+              <span className="brand-mark" aria-hidden="true">
+                <LogoMark />
+              </span>
+            </div>
+            <div className="auth-copy">
+              <h1>Opening Quotely</h1>
+              <p>Checking your sign-in session.</p>
+            </div>
+          </section>
+        </main>
+        <ToastViewport toast={toast} />
+      </>
     )
   }
 
   if (!session) {
     return (
-      <AuthScreen
-        error={authError}
-        isConfigured={isSupabaseConfigured}
-        message={authMessage}
-        onEmailAuth={handleEmailAuth}
-        onSocialLogin={handleSocialLogin}
-        socialProviders={socialProviders}
-      />
+      <>
+        <AuthScreen
+          error={authError}
+          fieldErrors={authFieldErrors}
+          isConfigured={isSupabaseConfigured}
+          message={authMessage}
+          onFieldChange={(field) => {
+            setAuthError('')
+            setAuthMessage('')
+            setAuthFieldErrors((currentErrors) => {
+              const nextErrors = { ...currentErrors }
+              delete nextErrors[field]
+              return nextErrors
+            })
+          }}
+          onEmailAuth={handleEmailAuth}
+          onSocialLogin={handleSocialLogin}
+          socialProviders={socialProviders}
+        />
+        <ToastViewport toast={toast} />
+      </>
     )
   }
 
-  return <SecureWorkspace account={session.user} onLogout={logout} />
+  return (
+    <>
+      <SecureWorkspace account={session.user} onLogout={logout} showFeedback={showFeedback} />
+      <ToastViewport toast={toast} />
+    </>
+  )
 }
 
 export default App

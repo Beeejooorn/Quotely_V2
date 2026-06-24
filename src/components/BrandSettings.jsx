@@ -1,3 +1,4 @@
+import { Building2, Palette } from 'lucide-react'
 import QuotePreview from './QuotePreview.jsx'
 
 export default function BrandSettings({ onChange, quote, settings, totals }) {
@@ -10,14 +11,36 @@ export default function BrandSettings({ onChange, quote, settings, totals }) {
       <div className="page-heading">
         <div>
           <p className="section-label">Brand settings</p>
-          <h1 id="settings-heading">Business details used on quotes.</h1>
+          <h1 id="settings-heading">Business details</h1>
+          <p className="page-subtitle">
+            Keep your company details and quote accent aligned before sending proposals.
+          </p>
         </div>
       </div>
 
       <div className="settings-grid">
         <form className="settings-panel">
-          <h2>Business profile</h2>
-          <p>These fields appear in the preview, print view, and downloaded HTML quote.</p>
+          <div className="settings-panel-top">
+            <div className="settings-icon" aria-hidden="true">
+              <Building2 />
+            </div>
+            <div>
+              <h2>Business profile</h2>
+              <p>These fields appear in the preview, print view, and downloaded HTML quote.</p>
+            </div>
+          </div>
+
+          <div className="settings-accent-card">
+            <div>
+              <span>Current accent</span>
+              <strong>{settings.accentColor}</strong>
+            </div>
+            <div
+              className="settings-accent-swatch"
+              aria-hidden="true"
+              style={{ backgroundColor: settings.accentColor }}
+            />
+          </div>
 
           <div className="form-grid">
             <label className="field span-2">
@@ -63,6 +86,10 @@ export default function BrandSettings({ onChange, quote, settings, totals }) {
                   onChange={(event) => updateSetting('accentColor', event.target.value)}
                 />
               </span>
+              <small className="field-hint">
+                <Palette aria-hidden="true" />
+                Used on buttons, quotation IDs, and key totals.
+              </small>
             </label>
           </div>
         </form>

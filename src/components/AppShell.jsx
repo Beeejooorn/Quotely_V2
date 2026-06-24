@@ -2,16 +2,18 @@ import {
   FileText,
   LayoutDashboard,
   LibraryBig,
-  LogOut,
+  PackageCheck,
   Plus,
   Settings,
   UserRound,
 } from 'lucide-react'
+import LogoMark from './LogoMark.jsx'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'create', label: 'Create Quotation', icon: FileText },
   { id: 'saved', label: 'Saved Quotations', icon: LibraryBig },
+  { id: 'services', label: 'Services', icon: PackageCheck },
 ]
 
 const utilityItems = [
@@ -23,16 +25,15 @@ const mobileUtilityItems = [
   ...utilityItems,
 ]
 
-function NavButton({ activeSection, item, onNavigate, onLogout }) {
+function NavButton({ activeSection, item, onNavigate }) {
   const Icon = item.icon
-  const isLogout = item.id === 'logout'
 
   return (
     <button
-      className={`nav-button ${activeSection === item.id ? 'active' : ''} ${isLogout ? 'logout-button' : ''}`}
+      className={`nav-button ${activeSection === item.id ? 'active' : ''}`}
       type="button"
       title={item.label}
-      onClick={() => (isLogout ? onLogout() : onNavigate(item.id))}
+      onClick={() => onNavigate(item.id)}
     >
       <Icon aria-hidden="true" />
       <span>{item.label}</span>
@@ -40,19 +41,27 @@ function NavButton({ activeSection, item, onNavigate, onLogout }) {
   )
 }
 
-export default function AppShell({ account, activeSection, accentColor, children, onLogout, onNavigate }) {
+export default function AppShell({
+  account,
+  activeSection,
+  accentColor,
+  children,
+  onNavigate,
+  profileImage,
+}) {
   const profileName =
     account?.user_metadata?.full_name ||
     account?.user_metadata?.name ||
     account?.email ||
     'Profile'
+  const uploadedProfileImage = profileImage && !profileImage.startsWith('preset:')
 
   return (
     <div className="app-shell" style={{ '--brand-accent': accentColor }}>
       <aside className="sidebar" aria-label="Primary navigation">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">
-            Q
+            <LogoMark />
           </span>
           <div className="brand-text">
             <strong>Quotely</strong>
@@ -73,28 +82,27 @@ export default function AppShell({ account, activeSection, accentColor, children
 
         <nav className="nav-list nav-list-bottom" aria-label="Workspace settings">
           <button
-            className={`profile-rail-button ${activeSection === 'profile' ? 'active' : ''}`}
+            className={`profile-rail-button ${uploadedProfileImage ? 'has-image' : ''} ${
+              activeSection === 'profile' ? 'active' : ''
+            }`}
             type="button"
             title={profileName}
             onClick={() => onNavigate('profile')}
           >
-            {profileName.slice(0, 1).toUpperCase()}
+            {uploadedProfileImage ? (
+              <img alt="" src={profileImage} />
+            ) : (
+              profileName.slice(0, 1).toUpperCase()
+            )}
           </button>
           {utilityItems.map((item) => (
             <NavButton
               activeSection={activeSection}
               item={item}
               key={item.id}
-              onLogout={onLogout}
               onNavigate={onNavigate}
             />
           ))}
-          <NavButton
-            activeSection={activeSection}
-            item={{ id: 'logout', label: 'Log out', icon: LogOut }}
-            onLogout={onLogout}
-            onNavigate={onNavigate}
-          />
         </nav>
       </aside>
 
@@ -102,7 +110,7 @@ export default function AppShell({ account, activeSection, accentColor, children
         <div className="mobile-brand-row">
           <div className="brand">
             <span className="brand-mark" aria-hidden="true">
-              Q
+              <LogoMark />
             </span>
             <div className="brand-text">
               <strong>Quotely</strong>
@@ -119,12 +127,11 @@ export default function AppShell({ account, activeSection, accentColor, children
           </button>
         </div>
         <nav className="mobile-nav" aria-label="Primary navigation">
-          {[...navItems, ...mobileUtilityItems, { id: 'logout', label: 'Log out', icon: LogOut }].map((item) => (
+          {[...navItems, ...mobileUtilityItems].map((item) => (
             <NavButton
               activeSection={activeSection}
               item={item}
               key={item.id}
-              onLogout={onLogout}
               onNavigate={onNavigate}
             />
           ))}
