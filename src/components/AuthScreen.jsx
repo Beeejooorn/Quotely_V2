@@ -1,7 +1,14 @@
 import { LogIn, Mail, LockKeyhole } from 'lucide-react'
 import { useState } from 'react'
 
-export default function AuthScreen({ error, isConfigured, message, onEmailAuth, onSocialLogin }) {
+export default function AuthScreen({
+  error,
+  isConfigured,
+  message,
+  onEmailAuth,
+  onSocialLogin,
+  socialProviders = {},
+}) {
   const [mode, setMode] = useState('login')
   const [form, setForm] = useState({
     email: '',
@@ -11,6 +18,17 @@ export default function AuthScreen({ error, isConfigured, message, onEmailAuth, 
   const isSignUp = mode === 'signup'
   const configMessage = !isConfigured ? 'Connect Supabase to enable live sign-in.' : ''
   const formError = isConfigured ? error : ''
+  const isCheckingSocialProviders =
+    isConfigured && (socialProviders.google === null || socialProviders.x === null)
+  const disabledSocialProviders = [
+    socialProviders.google === false ? 'Google' : '',
+    socialProviders.x === false ? 'X' : '',
+  ].filter(Boolean)
+  const socialSetupMessage = isCheckingSocialProviders
+    ? 'Checking social sign-in setup.'
+    : disabledSocialProviders.length
+      ? `Enable ${disabledSocialProviders.join(' and ')} in Supabase Auth providers to use social sign-in.`
+      : ''
 
   const updateField = (field, value) => {
     setForm((currentForm) => ({ ...currentForm, [field]: value }))
@@ -104,7 +122,7 @@ export default function AuthScreen({ error, isConfigured, message, onEmailAuth, 
         <div className="social-login-grid" aria-label="Other sign in options">
           <button
             className="social-login-button"
-            disabled={!isConfigured}
+            disabled={!isConfigured || socialProviders.google !== true}
             type="button"
             onClick={() => onSocialLogin('google')}
           >
@@ -113,14 +131,15 @@ export default function AuthScreen({ error, isConfigured, message, onEmailAuth, 
           </button>
           <button
             className="social-login-button"
-            disabled={!isConfigured}
+            disabled={!isConfigured || socialProviders.x !== true}
             type="button"
-            onClick={() => onSocialLogin('twitter')}
+            onClick={() => onSocialLogin('x')}
           >
             <span className="x-mark" aria-hidden="true" />
             X
           </button>
         </div>
+        {socialSetupMessage && <p className="auth-social-note">{socialSetupMessage}</p>}
       </section>
     </main>
   )

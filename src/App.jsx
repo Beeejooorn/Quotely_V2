@@ -8,7 +8,12 @@ import QuoteBuilder from './components/QuoteBuilder.jsx'
 import QuotePreview from './components/QuotePreview.jsx'
 import SavedQuotes from './components/SavedQuotes.jsx'
 import { defaultSettings, initialQuotes } from './data/seedQuotes.js'
-import { isSupabaseConfigured, supabase } from './lib/supabaseClient.js'
+import {
+  isSupabaseConfigured,
+  supabase,
+  supabaseKey,
+  supabaseUrl,
+} from './lib/supabaseClient.js'
 import {
   calculateQuote,
   createBlankQuote,
@@ -259,6 +264,10 @@ function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(isSupabaseConfigured)
   const [authError, setAuthError] = useState('')
   const [authMessage, setAuthMessage] = useState('')
+  const [socialProviders, setSocialProviders] = useState({
+    google: null,
+    x: null,
+  })
 
   useEffect(() => {
     if (!supabase) {
@@ -293,6 +302,50 @@ function App() {
     return () => {
       isMounted = false
       subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setSocialProviders({ google: false, x: false })
+      return
+    }
+
+    let isMounted = true
+
+    const loadAuthSettings = async () => {
+      try {
+        const response = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+          },
+        })
+
+        if (!response.ok) {
+          throw new Error('Could not check auth providers.')
+        }
+
+        const settings = await response.json()
+        const external = settings.external || {}
+
+        if (isMounted) {
+          setSocialProviders({
+            google: Boolean(external.google),
+            x: Boolean(external.x || external.twitter),
+          })
+        }
+      } catch {
+        if (isMounted) {
+          setSocialProviders({ google: true, x: true })
+        }
+      }
+    }
+
+    loadAuthSettings()
+
+    return () => {
+      isMounted = false
     }
   }, [])
 
@@ -362,6 +415,15 @@ function App() {
       return
     }
 
+    const providerName = provider === 'x' ? 'X' : 'Google'
+
+    if (socialProviders[provider] === false) {
+      setAuthError(
+        `${providerName} sign-in is not enabled in Supabase yet. Enable it under Authentication > Sign In / Providers.`,
+      )
+      return
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
@@ -400,6 +462,7 @@ function App() {
         message={authMessage}
         onEmailAuth={handleEmailAuth}
         onSocialLogin={handleSocialLogin}
+        socialProviders={socialProviders}
       />
     )
   }

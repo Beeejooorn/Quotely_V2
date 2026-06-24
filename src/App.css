@@ -412,6 +412,15 @@
   transform: none;
 }
 
+.auth-social-note {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.45;
+  text-align: center;
+}
+
 .google-mark,
 .x-mark {
   display: inline-grid;
