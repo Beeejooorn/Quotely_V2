@@ -31,44 +31,118 @@ const LEGACY_STORAGE_KEYS = {
   'brand-settings': 'quotely-brand-settings',
   quotes: 'quotely-quotes',
 }
+const WORKSPACE_STORAGE_KEYS = ['quotes', 'brand-settings', 'service-templates', 'profile-image']
+const LEGACY_WORKSPACE_OWNER_KEY = `quotely:legacy-workspace-owner:${STORAGE_VERSION}`
+const EMPTY_SERVICE_TEMPLATES = []
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-function getStorageKey(key) {
-  return `quotely:${key}:${STORAGE_VERSION}`
+function getStorageKey(key, accountId) {
+  return accountId
+    ? `quotely:${accountId}:${key}:${STORAGE_VERSION}`
+    : `quotely:${key}:${STORAGE_VERSION}`
 }
 
-function readStoredValue(key, fallback) {
+function normalizeStoredValue(key, value, fallback) {
+  if (key === 'quotes' && Array.isArray(value)) {
+    return value.filter((quote) => !String(quote.id || '').startsWith('seed-'))
+  }
+
+  if (key === 'brand-settings' && value?.accentColor === '#0f9f82') {
+    return { ...value, accentColor: fallback.accentColor }
+  }
+
+  return value
+}
+
+function readStoredValue(key, fallback, accountId) {
   try {
-    const storedValue =
-      window.localStorage.getItem(getStorageKey(key)) ||
-      window.localStorage.getItem(LEGACY_STORAGE_KEYS[key])
+    const storedValue = window.localStorage.getItem(getStorageKey(key, accountId))
     const parsedValue = storedValue ? JSON.parse(storedValue) : fallback
 
-    if (key === 'quotes' && Array.isArray(parsedValue)) {
-      return parsedValue.filter((quote) => !String(quote.id || '').startsWith('seed-'))
-    }
-
-    if (key === 'brand-settings' && parsedValue.accentColor === '#0f9f82') {
-      return { ...parsedValue, accentColor: fallback.accentColor }
-    }
-
-    return parsedValue
+    return normalizeStoredValue(key, parsedValue, fallback)
   } catch {
     return fallback
   }
 }
 
-function usePersistedState(key, initialValue) {
-  const [value, setValue] = useState(() => readStoredValue(key, initialValue))
+function getLegacyStoredValue(key) {
+  const possibleKeys = [getStorageKey(key), LEGACY_STORAGE_KEYS[key]].filter(Boolean)
+
+  for (const storageKey of possibleKeys) {
+    const storedValue = window.localStorage.getItem(storageKey)
+
+    if (storedValue) {
+      return storedValue
+    }
+  }
+
+  return null
+}
+
+function migrateLegacyWorkspace(accountId) {
+  if (!accountId) {
+    return
+  }
+
+  try {
+    const legacyOwner = window.localStorage.getItem(LEGACY_WORKSPACE_OWNER_KEY)
+
+    if (legacyOwner && legacyOwner !== accountId) {
+      return
+    }
+
+    const migrationKey = `quotely:${accountId}:legacy-migrated:${STORAGE_VERSION}`
+
+    if (window.localStorage.getItem(migrationKey)) {
+      return
+    }
+
+    const hasLegacyWorkspace = WORKSPACE_STORAGE_KEYS.some((key) => getLegacyStoredValue(key))
+
+    if (!hasLegacyWorkspace) {
+      window.localStorage.setItem(migrationKey, 'true')
+      return
+    }
+
+    if (!legacyOwner) {
+      window.localStorage.setItem(LEGACY_WORKSPACE_OWNER_KEY, accountId)
+    }
+
+    WORKSPACE_STORAGE_KEYS.forEach((key) => {
+      const accountKey = getStorageKey(key, accountId)
+
+      if (window.localStorage.getItem(accountKey)) {
+        return
+      }
+
+      const legacyValue = getLegacyStoredValue(key)
+
+      if (legacyValue) {
+        window.localStorage.setItem(accountKey, legacyValue)
+      }
+    })
+
+    window.localStorage.setItem(migrationKey, 'true')
+  } catch {
+    // localStorage can be unavailable in private browsing or quota-limited contexts.
+  }
+}
+
+function usePersistedState(key, initialValue, accountId) {
+  const [value, setValue] = useState(() => readStoredValue(key, initialValue, accountId))
+
+  useEffect(() => {
+    setValue(readStoredValue(key, initialValue, accountId))
+  }, [accountId, initialValue, key])
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(getStorageKey(key), JSON.stringify(value))
+      window.localStorage.setItem(getStorageKey(key, accountId), JSON.stringify(value))
     } catch {
       // localStorage can be unavailable in private browsing or quota-limited contexts.
     }
-  }, [key, value])
+  }, [accountId, key, value])
 
   return [value, setValue]
 }
@@ -176,13 +250,22 @@ function ToastViewport({ toast }) {
 }
 
 function SecureWorkspace({ account, onLogout, showFeedback }) {
-  const [quotes, setQuotes] = usePersistedState('quotes', initialQuotes)
+  const accountId = account?.id
+
+  migrateLegacyWorkspace(accountId)
+
+  const [quotes, setQuotes] = usePersistedState('quotes', initialQuotes, accountId)
   const [settings, setSettings] = usePersistedState(
     'brand-settings',
     defaultSettings,
+    accountId,
   )
-  const [serviceTemplates, setServiceTemplates] = usePersistedState('service-templates', [])
-  const [profileImage, setProfileImage] = usePersistedState('profile-image', '')
+  const [serviceTemplates, setServiceTemplates] = usePersistedState(
+    'service-templates',
+    EMPTY_SERVICE_TEMPLATES,
+    accountId,
+  )
+  const [profileImage, setProfileImage] = usePersistedState('profile-image', '', accountId)
   const [activeSection, setActiveSection] = useState('dashboard')
   const [selectedQuoteId, setSelectedQuoteId] = useState(null)
   const [quoteErrors, setQuoteErrors] = useState({})
@@ -824,7 +907,12 @@ function App() {
 
   return (
     <>
-      <SecureWorkspace account={session.user} onLogout={logout} showFeedback={showFeedback} />
+      <SecureWorkspace
+        account={session.user}
+        key={session.user.id}
+        onLogout={logout}
+        showFeedback={showFeedback}
+      />
       <ToastViewport toast={toast} />
     </>
   )
