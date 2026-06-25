@@ -1,12 +1,53 @@
-import { CircleDollarSign, Edit3, Layers3, PackageCheck, Plus, Save, Trash2 } from 'lucide-react'
+import {
+  CalendarClock,
+  CircleDollarSign,
+  Edit3,
+  Layers3,
+  ListChecks,
+  PackageCheck,
+  Plus,
+  Save,
+  Tag,
+  Trash2,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { peso, splitLines } from '../utils/quotation.js'
+import { formatDate, peso, splitLines } from '../utils/quotation.js'
 
 const emptyService = {
   id: null,
   name: '',
   description: '',
   price: 0,
+}
+
+function getServiceCategory(service) {
+  const text = `${service.name || ''} ${service.description || ''}`.toLowerCase()
+
+  if (/brand|logo|identity|visual/.test(text)) {
+    return 'Branding'
+  }
+
+  if (/event|wedding|coordination|party/.test(text)) {
+    return 'Events'
+  }
+
+  if (/retainer|monthly|support|maintenance/.test(text)) {
+    return 'Retainer'
+  }
+
+  if (/consult|strategy|audit|workshop/.test(text)) {
+    return 'Consulting'
+  }
+
+  if (/website|web|cms|landing|development|design/.test(text)) {
+    return 'Website'
+  }
+
+  return 'Service'
+}
+
+function getServiceLines(service) {
+  return splitLines(service.description)
 }
 
 export default function ServiceLibrary({ onDelete, onSave, services }) {
@@ -47,7 +88,7 @@ export default function ServiceLibrary({ onDelete, onSave, services }) {
           <p className="section-label">Services</p>
           <h1 id="services-heading">Service library</h1>
           <p className="page-subtitle">
-            Save common offers once, then apply them while creating a quote.
+            Save reusable packages and apply them instantly when creating a quotation.
           </p>
         </div>
       </div>
@@ -55,12 +96,12 @@ export default function ServiceLibrary({ onDelete, onSave, services }) {
       <div className="page-insight-grid services-insights" aria-label="Service library summary">
         <article className="insight-card accent">
           <PackageCheck aria-hidden="true" />
-          <span>Saved offers</span>
+          <span>Reusable packages</span>
           <strong>{services.length}</strong>
         </article>
         <article className="insight-card mint">
           <Layers3 aria-hidden="true" />
-          <span>Included lines</span>
+          <span>Deliverable lines</span>
           <strong>{serviceStats.includedLines}</strong>
         </article>
         <article className="insight-card amber">
@@ -74,51 +115,59 @@ export default function ServiceLibrary({ onDelete, onSave, services }) {
         <form className="services-form panel" onSubmit={submitService}>
           <div className="panel-header compact">
             <div>
-              <h2>{draftService.id ? 'Edit service' : 'New service'}</h2>
-              <p>Name the offer, set the price, and list what is included.</p>
+              <h2>{draftService.id ? 'Edit reusable package' : 'Create reusable package'}</h2>
+              <p>Save repeatable work once, then apply it when a quotation needs it.</p>
             </div>
             <PackageCheck aria-hidden="true" />
           </div>
 
           <div className="service-form-body">
-            <label className="field">
-              <span>Service or package name</span>
-              <input
-                value={draftService.name}
-                onChange={(event) => updateDraft('name', event.target.value)}
-                placeholder="Wedding coordination package"
-              />
-            </label>
+            <div className="service-form-grid">
+              <label className="field span-2">
+                <span>Package name</span>
+                <input
+                  value={draftService.name}
+                  onChange={(event) => updateDraft('name', event.target.value)}
+                  placeholder="Website launch package"
+                />
+                <small className="field-help">
+                  Use the package name you want clients to see in quotations.
+                </small>
+              </label>
+
+              <label className="field span-2">
+                <span>Package price</span>
+                <input
+                  min="0"
+                  type="number"
+                  value={draftService.price}
+                  onChange={(event) => updateDraft('price', event.target.value)}
+                  placeholder="25000"
+                />
+              </label>
+            </div>
 
             <label className="field">
-              <span>Price</span>
-              <input
-                min="0"
-                type="number"
-                value={draftService.price}
-                onChange={(event) => updateDraft('price', event.target.value)}
-                placeholder="25000"
-              />
-            </label>
-
-            <label className="field">
-              <span>Included services</span>
+              <span>Included deliverables</span>
               <textarea
                 value={draftService.description}
                 onChange={(event) => updateDraft('description', event.target.value)}
-                placeholder="One included service per line"
+                placeholder="Discovery call&#10;Homepage design&#10;Responsive development"
               />
+              <small className="field-help">
+                Add one deliverable per line so it drops cleanly into quotation previews.
+              </small>
             </label>
 
             <div className="form-actions">
               <button className="button primary" type="submit">
                 <Save aria-hidden="true" />
-                {draftService.id ? 'Update service' : 'Save service'}
+                {draftService.id ? 'Update package' : 'Save package'}
               </button>
               {draftService.id && (
                 <button className="button secondary" type="button" onClick={resetDraft}>
                   <Plus aria-hidden="true" />
-                  New service
+                  New package
                 </button>
               )}
             </div>
@@ -128,46 +177,86 @@ export default function ServiceLibrary({ onDelete, onSave, services }) {
         <article className="services-list panel">
           <div className="panel-header">
             <div>
-              <h2>Saved services</h2>
-              <p>These appear in the quotation builder.</p>
+              <h2>Saved packages</h2>
+              <p>Reusable packages available inside the quotation builder.</p>
             </div>
           </div>
 
           <div className="service-template-list">
             {services.length ? (
-              services.map((service) => (
-                <article className="service-template-card" key={service.id}>
-                  <div>
-                    <div className="service-card-title">
-                      <strong>{service.name}</strong>
-                      <span>{peso(service.price)}</span>
+              services.map((service) => {
+                const includedItems = getServiceLines(service)
+                const visibleItems = includedItems.slice(0, 3)
+                const extraItemCount = Math.max(includedItems.length - visibleItems.length, 0)
+
+                return (
+                  <article className="service-template-card" key={service.id}>
+                    <div className="service-card-main">
+                      <div className="service-card-meta">
+                        <span className="service-template-tag">
+                          <Tag aria-hidden="true" />
+                          {getServiceCategory(service)}
+                        </span>
+                        {service.updatedAt && (
+                          <span className="service-updated">
+                            <CalendarClock aria-hidden="true" />
+                            Updated {formatDate(service.updatedAt)}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="service-card-title">
+                        <strong>{service.name}</strong>
+                        <span>{peso(service.price)}</span>
+                      </div>
+
+                      <div className="service-card-includes">
+                        <div className="service-card-count">
+                          <ListChecks aria-hidden="true" />
+                          <span>{includedItems.length} deliverable{includedItems.length === 1 ? '' : 's'}</span>
+                        </div>
+                        <ul>
+                          {visibleItems.length ? (
+                            visibleItems.map((item) => <li key={item}>{item}</li>)
+                          ) : (
+                            <li>No deliverables added yet.</li>
+                          )}
+                        </ul>
+                        {extraItemCount > 0 && (
+                          <small>+{extraItemCount} more deliverable{extraItemCount === 1 ? '' : 's'}</small>
+                        )}
+                      </div>
                     </div>
-                    <p>{service.description || 'Included services missing.'}</p>
-                    <small>{splitLines(service.description).length} included line(s)</small>
-                  </div>
-                  <div className="table-actions">
-                    <button
-                      className="icon-button"
-                      type="button"
-                      title="Edit service"
-                      onClick={() => setDraftService(service)}
-                    >
-                      <Edit3 aria-hidden="true" />
-                    </button>
-                    <button
-                      className="icon-button danger"
-                      type="button"
-                      title="Delete service"
-                      onClick={() => onDelete(service.id)}
-                    >
-                      <Trash2 aria-hidden="true" />
-                    </button>
-                  </div>
-                </article>
-              ))
+
+                    <div className="service-card-actions">
+                      <button
+                        className="button secondary compact-button"
+                        type="button"
+                        onClick={() => setDraftService(service)}
+                      >
+                        <Edit3 aria-hidden="true" />
+                        Edit
+                      </button>
+                      <button
+                        className="icon-button danger"
+                        aria-label={`Delete ${service.name}`}
+                        type="button"
+                        title="Delete service"
+                        onClick={() => onDelete(service.id)}
+                      >
+                        <Trash2 aria-hidden="true" />
+                      </button>
+                    </div>
+                  </article>
+                )
+              })
             ) : (
-              <div className="empty-state">
-                No saved services yet. Add the offers you quote most often.
+              <div className="empty-state service-empty-state">
+                <PackageCheck aria-hidden="true" />
+                <strong>No reusable packages yet</strong>
+                <p>
+                  Add your repeatable services here so every new quotation starts faster.
+                </p>
               </div>
             )}
           </div>

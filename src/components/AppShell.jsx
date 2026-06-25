@@ -11,26 +11,29 @@ import LogoMark from './LogoMark.jsx'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'create', label: 'Create Quotation', icon: FileText },
-  { id: 'saved', label: 'Saved Quotations', icon: LibraryBig },
-  { id: 'services', label: 'Services', icon: PackageCheck },
+  { id: 'create', label: 'New Quote', icon: FileText },
+  { id: 'saved', label: 'Quotations', icon: LibraryBig },
+  { id: 'services', label: 'Service Library', icon: PackageCheck },
 ]
 
 const utilityItems = [
-  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'settings', label: 'Business Settings', icon: Settings },
 ]
 
 const mobileUtilityItems = [
-  { id: 'profile', label: 'Profile', icon: UserRound },
+  { id: 'profile', label: 'Account', icon: UserRound },
   ...utilityItems,
 ]
 
 function NavButton({ activeSection, item, onNavigate }) {
   const Icon = item.icon
+  const isActive = activeSection === item.id
 
   return (
     <button
-      className={`nav-button ${activeSection === item.id ? 'active' : ''}`}
+      aria-current={isActive ? 'page' : undefined}
+      aria-label={item.label}
+      className={`nav-button ${isActive ? 'active' : ''}`}
       type="button"
       title={item.label}
       onClick={() => onNavigate(item.id)}
@@ -82,18 +85,23 @@ export default function AppShell({
 
         <nav className="nav-list nav-list-bottom" aria-label="Workspace settings">
           <button
+            aria-current={activeSection === 'profile' ? 'page' : undefined}
+            aria-label="Profile and account"
             className={`profile-rail-button ${uploadedProfileImage ? 'has-image' : ''} ${
               activeSection === 'profile' ? 'active' : ''
             }`}
             type="button"
-            title={profileName}
+            title="Profile and account"
             onClick={() => onNavigate('profile')}
           >
-            {uploadedProfileImage ? (
-              <img alt="" src={profileImage} />
-            ) : (
-              profileName.slice(0, 1).toUpperCase()
-            )}
+            <span className="profile-rail-avatar" aria-hidden="true">
+              {uploadedProfileImage ? (
+                <img alt="" src={profileImage} />
+              ) : (
+                <span className="profile-initial">{profileName.slice(0, 1).toUpperCase()}</span>
+              )}
+            </span>
+            <span className="rail-tooltip">Profile and account</span>
           </button>
           {utilityItems.map((item) => (
             <NavButton
@@ -119,6 +127,7 @@ export default function AppShell({
           </div>
           <button
             className="icon-button"
+            aria-label="Create quotation"
             type="button"
             title="Create quotation"
             onClick={() => onNavigate('create')}

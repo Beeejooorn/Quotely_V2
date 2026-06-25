@@ -1,4 +1,4 @@
-import { Plus, Save, Trash2 } from 'lucide-react'
+import { Plus, RotateCcw, Save, Trash2 } from 'lucide-react'
 import {
   STATUS_OPTIONS,
   normalizeMoney,
@@ -16,6 +16,8 @@ export default function QuoteBuilder({
   serviceTemplates = [],
   totals,
 }) {
+  const errorMessages = Object.values(errors)
+
   const updateField = (field, value) => {
     onChange({ ...quote, [field]: value }, [field])
   }
@@ -44,20 +46,38 @@ export default function QuoteBuilder({
       <div className="builder-header">
         <div>
           <h2 id="builder-heading">Quotation details</h2>
-          <p>{isEditing ? 'Editing saved quotation' : 'Unsaved working draft'}</p>
+          <p>
+            {isEditing
+              ? 'Update this client quote and keep the preview aligned as you edit.'
+              : 'Add the quote details once, then review the client-ready preview beside it.'}
+          </p>
         </div>
-        <span className="quote-number-chip">{quote.quotationNumber}</span>
+        <div className="builder-header-meta">
+          <span className="quote-mode-chip">{isEditing ? 'Editing quote' : 'Draft quote'}</span>
+          <span className="quote-number-chip">{quote.quotationNumber}</span>
+        </div>
       </div>
 
       <form
         className="builder-form"
+        noValidate
         onSubmit={(event) => {
           event.preventDefault()
           onSave()
         }}
       >
+        {errorMessages.length > 0 && (
+          <div className="builder-error-summary" role="alert">
+            <strong>Complete the required quote details</strong>
+            <p>{errorMessages[0]}</p>
+          </div>
+        )}
+
         <section className="form-section">
-          <h3>Client and project</h3>
+          <div className="form-section-heading">
+            <h3><span>1</span> Client details</h3>
+            <p>Client, project, date, and location for this quotation.</p>
+          </div>
           <div className="form-grid">
             <label className="field">
               <span>Client name</span>
@@ -83,7 +103,7 @@ export default function QuoteBuilder({
               {errors.clientEmail && <small className="field-error">{errors.clientEmail}</small>}
             </label>
             <label className="field span-2">
-              <span>Business/project/event name</span>
+              <span>Project or event name</span>
               <input
                 aria-invalid={Boolean(errors.projectName)}
                 className={errors.projectName ? 'is-invalid' : undefined}
@@ -91,6 +111,7 @@ export default function QuoteBuilder({
                 onChange={(event) => updateField('projectName', event.target.value)}
                 placeholder="Corporate Year-End Party"
               />
+              <small className="field-help">This appears as the main project line in the preview.</small>
               {errors.projectName && <small className="field-error">{errors.projectName}</small>}
             </label>
             <label className="field">
@@ -119,7 +140,10 @@ export default function QuoteBuilder({
         </section>
 
         <section className="form-section">
-          <h3>Package and pricing</h3>
+          <div className="form-section-heading">
+            <h3><span>2</span> Package and pricing</h3>
+            <p>Apply a reusable package or price a custom service for this client.</p>
+          </div>
           <div className="form-grid">
             {serviceTemplates.length > 0 && (
               <label className="field span-2">
@@ -128,13 +152,16 @@ export default function QuoteBuilder({
                   value=""
                   onChange={(event) => event.target.value && onApplyService(event.target.value)}
                 >
-                  <option value="">Choose a saved service or package</option>
+                  <option value="">Choose a reusable package</option>
                   {serviceTemplates.map((template) => (
                     <option key={template.id} value={template.id}>
                       {template.name} - {peso(template.price)}
                     </option>
                   ))}
                 </select>
+                <small className="field-help">
+                  Applying a package fills the name, price, and deliverables.
+                </small>
               </label>
             )}
             <label className="field">
@@ -169,6 +196,7 @@ export default function QuoteBuilder({
                 onChange={(event) => updateField('servicesIncluded', event.target.value)}
                 placeholder="One service per line"
               />
+              <small className="field-help">Add one deliverable per line so the preview stays easy to scan.</small>
               {errors.servicesIncluded && (
                 <small className="field-error">{errors.servicesIncluded}</small>
               )}
@@ -176,7 +204,10 @@ export default function QuoteBuilder({
           </div>
 
           <div className="addons-list">
-            <span className="field-label">Add-ons</span>
+            <div className="addons-heading">
+              <span className="field-label">Add-ons</span>
+              <small>Optional extras listed after the main package.</small>
+            </div>
             {quote.addOns.map((item, index) => (
               <div className="addon-row" key={`${index}-${item.name}`}>
                 <input
@@ -212,7 +243,10 @@ export default function QuoteBuilder({
         </section>
 
         <section className="form-section">
-          <h3>Terms and status</h3>
+          <div className="form-section-heading">
+            <h3><span>3</span> Terms and validity</h3>
+            <p>Set payment expectations, quote status, and expiry date.</p>
+          </div>
           <div className="form-grid">
             <label className="field">
               <span>Discount</span>
@@ -222,6 +256,7 @@ export default function QuoteBuilder({
                 value={quote.discount}
                 onChange={(event) => updateField('discount', normalizeMoney(event.target.value))}
               />
+              <small className="field-help">Shown as a deduction in the amount breakdown.</small>
             </label>
             <label className="field">
               <span>Status</span>
@@ -235,9 +270,10 @@ export default function QuoteBuilder({
                   </option>
                 ))}
               </select>
+              <small className="field-help">Use Draft while preparing, then Sent or Pending after sharing.</small>
             </label>
             <label className="field">
-              <span>Quotation validity date</span>
+              <span>Valid until</span>
               <input
                 aria-invalid={Boolean(errors.validityDate)}
                 className={errors.validityDate ? 'is-invalid' : undefined}
@@ -245,6 +281,7 @@ export default function QuoteBuilder({
                 value={quote.validityDate}
                 onChange={(event) => updateField('validityDate', event.target.value)}
               />
+              <small className="field-help">This date powers follow-ups, attention cards, and the calendar.</small>
               {errors.validityDate && <small className="field-error">{errors.validityDate}</small>}
             </label>
             <label className="field span-2">
@@ -254,7 +291,9 @@ export default function QuoteBuilder({
                 className={errors.paymentTerms ? 'is-invalid' : undefined}
                 value={quote.paymentTerms}
                 onChange={(event) => updateField('paymentTerms', event.target.value)}
+                placeholder="Example: 50% down payment, balance due before delivery."
               />
+              <small className="field-help">Keep it short so clients understand the payment step.</small>
               {errors.paymentTerms && <small className="field-error">{errors.paymentTerms}</small>}
             </label>
             <label className="field span-2">
@@ -264,11 +303,31 @@ export default function QuoteBuilder({
                 onChange={(event) => updateField('notes', event.target.value)}
                 placeholder="Add delivery notes, exclusions, or approval reminders."
               />
+              <small className="field-help">Optional notes, exclusions, or approval reminders for this quote.</small>
             </label>
           </div>
         </section>
 
+        <section className="form-section preview-export-section">
+          <div className="form-section-heading">
+            <h3><span>4</span> Preview and export</h3>
+            <p>Review the client-facing document, then save before printing or downloading.</p>
+          </div>
+          <div className="preview-export-card">
+            <span>{quote.quotationNumber}</span>
+            <strong>{peso(totals.total)}</strong>
+            <p>Live quote total</p>
+          </div>
+        </section>
+
         <div className="total-strip" aria-live="polite">
+          <div className="total-strip-header">
+            <div>
+              <h3>Quotation total</h3>
+              <p>Calculated from package price, add-ons, and discount.</p>
+            </div>
+            <span>{quote.quotationNumber}</span>
+          </div>
           <div className="total-line">
             <span>Base package</span>
             <strong>{peso(totals.basePrice)}</strong>
@@ -288,12 +347,13 @@ export default function QuoteBuilder({
         </div>
 
         <div className="form-actions">
+          <button className="button secondary" type="button" onClick={onNew}>
+            <RotateCcw aria-hidden="true" />
+            New quote
+          </button>
           <button className="button primary" type="submit">
             <Save aria-hidden="true" />
             Save quotation
-          </button>
-          <button className="button secondary" type="button" onClick={onNew}>
-            New quote
           </button>
         </div>
       </form>

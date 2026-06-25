@@ -1,4 +1,4 @@
-import { CircleDollarSign, Clock3, Eye, FileText, Plus, Search, Trash2 } from 'lucide-react'
+import { CircleDollarSign, Clock3, Download, Eye, FileText, Plus, Search, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import StatusBadge from './StatusBadge.jsx'
 import {
@@ -8,9 +8,56 @@ import {
   STATUS_OPTIONS,
 } from '../utils/quotation.js'
 
+function parseDateOnly(value) {
+  const [year, month, day] = String(value || '')
+    .split('-')
+    .map(Number)
+
+  if (!year || !month || !day) {
+    return null
+  }
+
+  return new Date(year, month - 1, day)
+}
+
+function getValidityState(value, status) {
+  if (status === 'Approved') {
+    return { label: 'Approved', tone: 'good' }
+  }
+
+  if (status === 'Rejected') {
+    return { label: 'Closed', tone: 'muted' }
+  }
+
+  const targetDate = parseDateOnly(value)
+
+  if (!targetDate) {
+    return { label: 'No expiry date', tone: 'muted' }
+  }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const days = Math.ceil((targetDate - today) / 86400000)
+
+  if (days < 0) {
+    return { label: `Expired ${Math.abs(days)}d ago`, tone: 'danger' }
+  }
+
+  if (days === 0) {
+    return { label: 'Expires today', tone: 'urgent' }
+  }
+
+  if (days <= 3) {
+    return { label: `Follow up in ${days}d`, tone: 'urgent' }
+  }
+
+  return { label: `${days}d left`, tone: 'calm' }
+}
+
 export default function SavedQuotes({
   onCreate,
   onDelete,
+  onDownload,
   onStatusChange,
   onView,
   quotes,
@@ -55,7 +102,7 @@ export default function SavedQuotes({
           <p className="section-label">Saved quotations</p>
           <h1 id="saved-heading">Saved quotations</h1>
           <p className="page-subtitle">
-            Track every sent quote, follow up on pending work, and reopen details fast.
+            Find client quotations, update status, and reopen drafts when work changes.
           </p>
         </div>
         <button className="button primary" type="button" onClick={onCreate}>
@@ -67,12 +114,12 @@ export default function SavedQuotes({
       <div className="page-insight-grid saved-insights" aria-label="Quotation summary">
         <article className="insight-card">
           <FileText aria-hidden="true" />
-          <span>Total quotes</span>
+          <span>Total quotations</span>
           <strong>{quotes.length}</strong>
         </article>
         <article className="insight-card accent">
           <CircleDollarSign aria-hidden="true" />
-          <span>Total quoted</span>
+          <span>Quoted value</span>
           <strong>{peso(quoteStats.totalValue)}</strong>
         </article>
         <article className="insight-card amber">
@@ -97,7 +144,7 @@ export default function SavedQuotes({
                 className="toolbar-input"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search client, project, or QLY number"
+                placeholder="Search client, project, email, or QLY number"
               />
             </div>
           </label>
@@ -117,6 +164,10 @@ export default function SavedQuotes({
             </select>
           </label>
         </div>
+        <p className="saved-toolbar-summary">
+          Showing <strong>{filteredQuotes.length}</strong> of {quotes.length} quotation
+          {quotes.length === 1 ? '' : 's'}
+        </p>
       </div>
 
       <article className="saved-panel">
@@ -126,33 +177,123 @@ export default function SavedQuotes({
               <thead>
                 <tr>
                   <th>Quotation</th>
-                  <th>Client</th>
-                  <th>Project/event</th>
                   <th>Amount</th>
                   <th>Status</th>
-                  <th>Date created</th>
+                  <th>Next step</th>
+                  <th>Dates</th>
                   <th aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
-                {filteredQuotes.map((quote) => (
-                  <tr key={quote.id}>
-                    <td>
-                      <span className="quote-id-chip">{quote.quotationNumber}</span>
-                    </td>
-                    <td>
-                      <span className="quote-title">
-                        {quote.clientName || 'Client missing'}
+                {filteredQuotes.map((quote) => {
+                  const validityState = getValidityState(quote.validityDate, quote.status)
+
+                  return (
+                    <tr key={quote.id}>
+                      <td>
+                        <div className="quote-table-identity">
+                          <span className="quote-id-chip">{quote.quotationNumber}</span>
+                          <span className="quote-title">
+                            {quote.clientName || 'Unnamed client'}
+                          </span>
+                          <span className="quote-meta">{quote.projectName || 'Untitled project'}</span>
+                          {quote.clientEmail ? (
+                            <span className="quote-meta subtle">{quote.clientEmail}</span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td>
+                        <strong className="quote-table-amount">{peso(calculateQuote(quote).total)}</strong>
+                      </td>
+                      <td>
+                        <select
+                          className="status-select quote-status-select"
+                          value={quote.status}
+                          onChange={(event) => onStatusChange(quote.id, event.target.value)}
+                        >
+                          {STATUS_OPTIONS.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <span className={`follow-up-pill tone-${validityState.tone}`}>
+                          {validityState.label}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="quote-date-stack">
+                          <span>Expires {formatDate(quote.validityDate)}</span>
+                          <small>Updated {formatDate(quote.updatedAt || quote.createdAt)}</small>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="table-actions">
+                          <button
+                            className="table-open-button"
+                            aria-label={`Open ${quote.quotationNumber}`}
+                            type="button"
+                            onClick={() => onView(quote)}
+                          >
+                            <Eye aria-hidden="true" />
+                            Open
+                          </button>
+                          <button
+                            className="icon-button quiet"
+                            aria-label={`Download ${quote.quotationNumber}`}
+                            type="button"
+                            title="Download quotation"
+                            onClick={() => onDownload(quote)}
+                          >
+                            <Download aria-hidden="true" />
+                          </button>
+                          <button
+                            className="icon-button danger quiet"
+                            aria-label={`Delete ${quote.quotationNumber}`}
+                            type="button"
+                            title="Delete quotation"
+                            onClick={() => onDelete(quote.id)}
+                          >
+                            <Trash2 aria-hidden="true" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+
+            <div className="quote-cards">
+              {filteredQuotes.map((quote) => {
+                const validityState = getValidityState(quote.validityDate, quote.status)
+
+                return (
+                  <article className="quote-card" key={quote.id}>
+                    <div className="quote-card-top">
+                      <div>
+                        <span className="quote-id-chip">{quote.quotationNumber}</span>
+                        <span className="quote-meta">Updated {formatDate(quote.updatedAt || quote.createdAt)}</span>
+                      </div>
+                      <StatusBadge status={quote.status} />
+                    </div>
+                    <div className="quote-card-body">
+                      <span className="quote-title">{quote.clientName || 'Unnamed client'}</span>
+                      <span className="quote-meta">{quote.projectName || 'Untitled project'}</span>
+                      <span className={`follow-up-pill tone-${validityState.tone}`}>
+                        {validityState.label}
                       </span>
-                      <span className="quote-meta">{quote.clientEmail}</span>
-                    </td>
-                    <td>{quote.projectName || 'Project missing'}</td>
-                    <td>
-                      <strong>{peso(calculateQuote(quote).total)}</strong>
-                    </td>
-                    <td>
+                      <span className="quote-meta">Expires {formatDate(quote.validityDate)}</span>
+                      <strong className="quote-card-total">
+                        {peso(calculateQuote(quote).total)}
+                      </strong>
+                    </div>
+                    <label className="field quote-card-status">
+                      <span>Update status</span>
                       <select
-                        className="status-select"
+                        aria-label={`Update status for ${quote.quotationNumber}`}
                         value={quote.status}
                         onChange={(event) => onStatusChange(quote.id, event.target.value)}
                       >
@@ -162,86 +303,41 @@ export default function SavedQuotes({
                           </option>
                         ))}
                       </select>
-                    </td>
-                    <td>{formatDate(quote.createdAt)}</td>
-                    <td>
-                      <div className="table-actions">
-                        <button
-                          className="icon-button"
-                          type="button"
-                          title="View quotation"
-                          onClick={() => onView(quote)}
-                        >
-                          <Eye aria-hidden="true" />
-                        </button>
-                        <button
-                          className="icon-button danger"
-                          type="button"
-                          title="Delete quotation"
-                          onClick={() => onDelete(quote.id)}
-                        >
-                          <Trash2 aria-hidden="true" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div className="quote-cards">
-              {filteredQuotes.map((quote) => (
-                <article className="quote-card" key={quote.id}>
-                  <div className="quote-card-top">
-                    <div>
-                      <span className="quote-id-chip">{quote.quotationNumber}</span>
-                      <span className="quote-meta">{formatDate(quote.createdAt)}</span>
+                    </label>
+                    <div className="quote-card-actions">
+                      <button className="button secondary" type="button" onClick={() => onView(quote)}>
+                        <Eye aria-hidden="true" />
+                        Open
+                      </button>
+                      <button className="button secondary" type="button" onClick={() => onDownload(quote)}>
+                        <Download aria-hidden="true" />
+                        Download
+                      </button>
+                      <button className="button danger" type="button" onClick={() => onDelete(quote.id)}>
+                        <Trash2 aria-hidden="true" />
+                        Delete
+                      </button>
                     </div>
-                    <StatusBadge status={quote.status} />
-                  </div>
-                  <div className="quote-card-body">
-                    <span className="quote-title">{quote.clientName || 'Client missing'}</span>
-                    <span className="quote-meta">{quote.projectName || 'Project missing'}</span>
-                    <strong className="quote-card-total">
-                      {peso(calculateQuote(quote).total)}
-                    </strong>
-                  </div>
-                  <label className="field quote-card-status">
-                    <span>Update status</span>
-                    <select
-                      value={quote.status}
-                      onChange={(event) => onStatusChange(quote.id, event.target.value)}
-                    >
-                      {STATUS_OPTIONS.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="quote-card-actions">
-                    <button className="button secondary" type="button" onClick={() => onView(quote)}>
-                      <Eye aria-hidden="true" />
-                      View
-                    </button>
-                    <button className="button danger" type="button" onClick={() => onDelete(quote.id)}>
-                      <Trash2 aria-hidden="true" />
-                      Delete
-                    </button>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                )
+              })}
             </div>
           </>
         ) : (
           <div className="empty-state elevated-empty">
             <FileText aria-hidden="true" />
-            <strong>No quotations found</strong>
+            <strong>No matching quotations</strong>
             <p>
               {quotes.length
-                ? 'Try a different search or status filter.'
-                : 'Create your first quotation and it will appear here.'}
+                ? 'Adjust the search or status filter to find the quote you need.'
+                : 'Create your first quotation and it will be saved here for follow-up.'}
             </p>
+            {!quotes.length && (
+              <button className="button primary" type="button" onClick={onCreate}>
+                <Plus aria-hidden="true" />
+                Create quotation
+              </button>
+            )}
           </div>
         )}
       </article>

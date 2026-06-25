@@ -34,8 +34,68 @@ const LEGACY_STORAGE_KEYS = {
 const WORKSPACE_STORAGE_KEYS = ['quotes', 'brand-settings', 'service-templates', 'profile-image']
 const LEGACY_WORKSPACE_OWNER_KEY = `quotely:legacy-workspace-owner:${STORAGE_VERSION}`
 const EMPTY_SERVICE_TEMPLATES = []
+const DEMO_CLIENT_FIXES = {
+  'harry jay ortega': {
+    clientEmail: 'isabel.reyes@studiomarquee.co',
+    clientName: 'Isabel Reyes',
+    location: 'Makati City',
+    projectName: 'Studio Marquee Website Redesign',
+  },
+  'marco duchsand': {
+    clientEmail: 'hello@northlineevents.com',
+    clientName: 'Northline Events Co.',
+    location: 'Valencia City',
+    projectName: 'Website CMS Integration',
+  },
+  'mbappe duchsand': {
+    clientEmail: 'billing@brightpathcreative.co',
+    clientName: 'BrightPath Creative',
+    location: 'Cagayan de Oro',
+    projectName: 'Brand Identity Sprint',
+  },
+  'trsh plyr': {
+    clientEmail: 'adrian.santos@northlineevents.com',
+    clientName: 'Adrian Santos',
+    location: 'Davao City',
+    projectName: 'Event Proposal Package',
+  },
+}
+const DEMO_EMAIL_FIXES = {
+  'harry@gmail.com': 'isabel.reyes@studiomarquee.co',
+}
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function polishServiceText(value) {
+  return String(value || '')
+    .replace(/Integrate CMS in webflow made websites/gi, 'Integrate CMS into Webflow-built websites.')
+    .replace(/\bwebflow\b/g, 'Webflow')
+    .replace(/\bwebsite redesign\b/gi, 'Website Redesign')
+}
+
+function normalizeStoredQuote(quote) {
+  const normalizedClient = String(quote.clientName || '').trim().toLowerCase()
+  const fixedClient = DEMO_CLIENT_FIXES[normalizedClient] || {}
+  const normalizedEmail = String(quote.clientEmail || '').trim().toLowerCase()
+
+  return {
+    ...quote,
+    ...fixedClient,
+    clientEmail: fixedClient.clientEmail || DEMO_EMAIL_FIXES[normalizedEmail] || quote.clientEmail,
+    packageType: polishServiceText(quote.packageType),
+    paymentTerms: polishServiceText(quote.paymentTerms),
+    projectName: fixedClient.projectName || polishServiceText(quote.projectName),
+    servicesIncluded: polishServiceText(quote.servicesIncluded),
+  }
+}
+
+function normalizeStoredService(template) {
+  return {
+    ...template,
+    description: polishServiceText(template.description),
+    name: polishServiceText(template.name),
+  }
+}
 
 function getStorageKey(key, accountId) {
   return accountId
@@ -45,7 +105,13 @@ function getStorageKey(key, accountId) {
 
 function normalizeStoredValue(key, value, fallback) {
   if (key === 'quotes' && Array.isArray(value)) {
-    return value.filter((quote) => !String(quote.id || '').startsWith('seed-'))
+    return value
+      .filter((quote) => !String(quote.id || '').startsWith('seed-'))
+      .map(normalizeStoredQuote)
+  }
+
+  if (key === 'service-templates' && Array.isArray(value)) {
+    return value.map(normalizeStoredService)
   }
 
   if (key === 'brand-settings' && value?.accentColor === '#0f9f82') {
@@ -173,13 +239,13 @@ function validateQuoteDraft(quote) {
   const errors = {}
 
   if (!quote.clientName.trim()) {
-    errors.clientName = 'Add the client name.'
+    errors.clientName = 'Add the client name before saving.'
   }
 
   if (!quote.clientEmail.trim()) {
-    errors.clientEmail = 'Add the client email.'
+    errors.clientEmail = 'Add the client email before saving.'
   } else if (!isValidEmail(quote.clientEmail)) {
-    errors.clientEmail = 'Use a valid email address.'
+    errors.clientEmail = 'Use a valid client email address.'
   }
 
   if (!quote.projectName.trim()) {
@@ -187,11 +253,11 @@ function validateQuoteDraft(quote) {
   }
 
   if (!quote.eventDate) {
-    errors.eventDate = 'Choose the project date.'
+    errors.eventDate = 'Choose the project or event date.'
   }
 
   if (!quote.location.trim()) {
-    errors.location = 'Add the location.'
+    errors.location = 'Add the project location.'
   }
 
   if (!quote.packageType.trim()) {
@@ -203,15 +269,15 @@ function validateQuoteDraft(quote) {
   }
 
   if (!splitLines(quote.servicesIncluded).length) {
-    errors.servicesIncluded = 'Add at least one included service.'
+    errors.servicesIncluded = 'Add at least one included deliverable.'
   }
 
   if (!quote.validityDate) {
-    errors.validityDate = 'Choose a validity date.'
+    errors.validityDate = 'Choose an expiry date.'
   }
 
   if (!quote.paymentTerms.trim()) {
-    errors.paymentTerms = 'Add payment terms.'
+    errors.paymentTerms = 'Add payment terms for the client.'
   }
 
   return errors
@@ -271,7 +337,7 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
   const [quoteErrors, setQuoteErrors] = useState({})
   const settingsFeedbackRef = useRef(null)
   const [draftQuote, setDraftQuote] = useState(() =>
-    createBlankQuote(nextQuoteNumber(quotes)),
+    createBlankQuote(nextQuoteNumber(quotes), settings),
   )
 
   const draftTotals = useMemo(() => calculateQuote(draftQuote), [draftQuote])
@@ -308,12 +374,12 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
 
   const startNewQuote = (nextQuotes = quotes, shouldNotify = true) => {
     setSelectedQuoteId(null)
-    setDraftQuote(createBlankQuote(nextQuoteNumber(nextQuotes)))
+    setDraftQuote(createBlankQuote(nextQuoteNumber(nextQuotes), settings))
     setQuoteErrors({})
     setActiveSection('create')
 
     if (shouldNotify) {
-      showFeedback('New draft started', 'Fill in the quotation details when ready.')
+      showFeedback('New quote draft ready', 'Add the client, package, and terms when ready.')
     }
   }
 
@@ -324,7 +390,7 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
       setQuoteErrors(validationErrors)
       setActiveSection('create')
       showFeedback(
-        'Quotation needs details',
+        'Quotation needs a few details',
         Object.values(validationErrors)[0],
         'error',
       )
@@ -352,7 +418,7 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
     setActiveSection('saved')
     showFeedback(
       wasEditing ? 'Quotation updated' : 'Quotation saved',
-      `${savedQuote.quotationNumber} is now in Saved Quotations.`,
+      `${savedQuote.quotationNumber} is saved and ready for follow-up.`,
     )
   }
 
@@ -372,14 +438,14 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
 
     if (quoteId === selectedQuoteId) {
       setSelectedQuoteId(null)
-      setDraftQuote(createBlankQuote(nextQuoteNumber(nextQuotes)))
+      setDraftQuote(createBlankQuote(nextQuoteNumber(nextQuotes), settings))
     }
 
     showFeedback(
       'Quotation deleted',
       deletedQuote?.quotationNumber
-        ? `${deletedQuote.quotationNumber} was removed.`
-        : 'The quotation was removed.',
+        ? `${deletedQuote.quotationNumber} was removed from your workspace.`
+        : 'The quotation was removed from your workspace.',
     )
   }
 
@@ -400,7 +466,7 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
 
     showFeedback(
       'Status updated',
-      `${updatedQuote?.quotationNumber || 'Quotation'} moved to ${status}.`,
+      `${updatedQuote?.quotationNumber || 'Quotation'} is now marked ${status}.`,
     )
   }
 
@@ -411,17 +477,17 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
     }
 
     settingsFeedbackRef.current = window.setTimeout(() => {
-      showFeedback('Brand settings saved', 'Quotation previews now use the latest details.')
+      showFeedback('Business details saved', 'New previews now use your latest business information.')
     }, 650)
   }
 
   const downloadQuote = () => {
     downloadQuotationHtml(draftQuote, settings)
-    showFeedback('Download prepared', `${draftQuote.quotationNumber} was downloaded as HTML.`)
+    showFeedback('Quotation downloaded', `${draftQuote.quotationNumber} was saved as an HTML file.`)
   }
 
   const printQuote = () => {
-    showFeedback('Print dialog opening', 'Use your browser print options to finish.')
+    showFeedback('Print dialog opening', 'Choose your print or PDF settings to finish.')
     window.print()
   }
 
@@ -429,19 +495,19 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
     const nextTemplate = normalizeServiceTemplate(template)
 
     if (!nextTemplate.name) {
-      showFeedback('Service name required', 'Add a name before saving this service.', 'error')
+      showFeedback('Add a package name', 'Name this reusable package before saving.', 'error')
       return false
     }
 
     if (nextTemplate.price <= 0) {
-      showFeedback('Service price required', 'Add a price greater than zero.', 'error')
+      showFeedback('Add a package price', 'Use a package price greater than zero.', 'error')
       return false
     }
 
     if (!splitLines(nextTemplate.description).length) {
       showFeedback(
-        'Service details required',
-        'Add at least one included service line.',
+        'Add deliverables',
+        'Add at least one deliverable line for this package.',
         'error',
       )
       return false
@@ -459,7 +525,7 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
       return [nextTemplate, ...currentTemplates]
     })
 
-    showFeedback('Service saved', `${nextTemplate.name} is ready for quotations.`)
+    showFeedback('Package saved', `${nextTemplate.name} is ready for new quotations.`)
     return true
   }
 
@@ -470,8 +536,8 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
       currentTemplates.filter((item) => item.id !== templateId),
     )
     showFeedback(
-      'Service deleted',
-      deletedTemplate?.name ? `${deletedTemplate.name} was removed.` : 'The service was removed.',
+      'Package deleted',
+      deletedTemplate?.name ? `${deletedTemplate.name} was removed.` : 'The package was removed.',
     )
   }
 
@@ -491,17 +557,17 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
       },
       ['packageType', 'basePrice', 'servicesIncluded'],
     )
-    showFeedback('Service applied', `${selectedTemplate.name} was added to this quote.`)
+    showFeedback('Package applied', `${selectedTemplate.name} was added to this quotation.`)
   }
 
   const updateProfileImage = (imageDataUrl) => {
     setProfileImage(imageDataUrl)
-    showFeedback('Profile photo updated', 'Your workspace profile now uses this image.')
+    showFeedback('Profile image updated', 'Your sidebar now uses this image.')
   }
 
   const removeProfileImage = () => {
     setProfileImage('')
-    showFeedback('Profile photo removed', 'Your profile now uses the default mark.')
+    showFeedback('Profile image removed', 'Your account now uses the default profile mark.')
   }
 
   const renderSection = () => {
@@ -524,6 +590,10 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
           quotes={quotes}
           onCreate={() => startNewQuote()}
           onDelete={deleteQuote}
+          onDownload={(quote) => {
+            downloadQuotationHtml(quote, settings)
+            showFeedback('Quotation downloaded', `${quote.quotationNumber} was saved as an HTML file.`)
+          }}
           onStatusChange={updateQuoteStatus}
           onView={viewQuote}
         />
@@ -545,6 +615,7 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
         <BrandSettings
           settings={settings}
           onChange={updateSettings}
+          onFeedback={showFeedback}
           quote={draftQuote}
           totals={draftTotals}
         />
@@ -560,6 +631,9 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
               <h1 id="create-heading">
                 {isEditing ? 'Edit quotation details' : 'Create a quotation'}
               </h1>
+              <p className="page-subtitle">
+                Add the client, package, pricing, and terms before sending.
+              </p>
             </div>
             <div className="heading-actions">
               <button
@@ -658,7 +732,7 @@ function App() {
   useEffect(() => {
     if (!supabase) {
       setIsAuthLoading(false)
-      setAuthError('Add Supabase environment variables to enable live sign-in.')
+      setAuthError('Sign-in is not ready yet.')
       return undefined
     }
 
@@ -671,7 +745,7 @@ function App() {
 
       if (error) {
         setAuthError(error.message)
-        showFeedback('Session check failed', error.message, 'error')
+        showFeedback('Could not check your session', error.message, 'error')
       }
 
       setSession(data.session)
@@ -687,7 +761,7 @@ function App() {
       setAuthMessage('')
 
       if (event === 'SIGNED_IN') {
-        showFeedback('Signed in', 'Your Quotely workspace is ready.')
+        showFeedback('Signed in', 'Your quotation workspace is ready.')
       }
     })
 
@@ -715,7 +789,7 @@ function App() {
         })
 
         if (!response.ok) {
-          throw new Error('Could not check auth providers.')
+          throw new Error('Could not check sign-in options.')
         }
 
         const settings = await response.json()
@@ -743,8 +817,8 @@ function App() {
 
   const handleEmailAuth = async ({ email, mode, name, password }) => {
     if (!supabase) {
-      setAuthError('Add Supabase environment variables to enable live sign-in.')
-      showFeedback('Live sign-in is not ready', 'Add the Supabase environment variables.', 'error')
+      setAuthError('Sign-in is not ready yet.')
+      showFeedback('Sign-in is not ready', 'Finish sign-in setup before launching Quotely.', 'error')
       return
     }
 
@@ -772,7 +846,7 @@ function App() {
       const firstError = Object.values(fieldErrors)[0]
       setAuthFieldErrors(fieldErrors)
       setAuthError(firstError)
-      showFeedback('Check the sign-in form', firstError, 'error')
+      showFeedback('Check the sign-in details', firstError, 'error')
       return
     }
 
@@ -794,7 +868,7 @@ function App() {
 
     if (response.error) {
       setAuthError(response.error.message)
-      showFeedback('Authentication failed', response.error.message, 'error')
+      showFeedback('Sign-in failed', response.error.message, 'error')
       return
     }
 
@@ -802,11 +876,11 @@ function App() {
     setAuthFieldErrors({})
     setAuthMessage(
       mode === 'signup' && !response.data.session
-        ? 'Check your email to confirm your account.'
+        ? 'Check your email to confirm your Quotely account.'
         : '',
     )
     if (mode === 'signup' && !response.data.session) {
-      showFeedback('Account created', 'Check your email to confirm your account.')
+      showFeedback('Account created', 'Check your email to confirm your Quotely account.')
     }
   }
 
@@ -818,32 +892,30 @@ function App() {
     setSession(null)
     setAuthError('')
     setAuthFieldErrors({})
-    setAuthMessage('You have been logged out.')
-    showFeedback('Logged out', 'Your Quotely session has ended.')
+    setAuthMessage('You have been logged out of Quotely.')
+    showFeedback('Logged out', 'This browser no longer has access to your workspace.')
   }
 
   const handleSocialLogin = async (provider) => {
     if (!supabase) {
-      setAuthError('Add Supabase environment variables to enable live sign-in.')
-      showFeedback('Live sign-in is not ready', 'Add the Supabase environment variables.', 'error')
+      setAuthError('Sign-in is not ready yet.')
+      showFeedback('Sign-in is not ready', 'Finish sign-in setup before launching Quotely.', 'error')
       return
     }
 
     const providerName = provider === 'x' ? 'X' : 'Google'
 
     if (socialProviders[provider] === false) {
-      setAuthError(
-        `${providerName} sign-in is not enabled in Supabase yet. Enable it under Authentication > Sign In / Providers.`,
-      )
+      setAuthError(`${providerName} sign-in is not available yet.`)
       showFeedback(
         `${providerName} sign-in unavailable`,
-        'Enable the provider in Supabase Auth settings first.',
+        'Use email sign-in for now or choose another available option.',
         'error',
       )
       return
     }
 
-    showFeedback(`Opening ${providerName}`, 'Complete the secure sign-in in your browser.')
+    showFeedback(`Opening ${providerName}`, 'Complete the secure sign-in to return to Quotely.')
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
@@ -870,7 +942,7 @@ function App() {
             </div>
             <div className="auth-copy">
               <h1>Opening Quotely</h1>
-              <p>Checking your sign-in session.</p>
+              <p>Checking whether this browser already has workspace access.</p>
             </div>
           </section>
         </main>

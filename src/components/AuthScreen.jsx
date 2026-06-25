@@ -1,4 +1,4 @@
-import { LogIn, Mail, LockKeyhole } from 'lucide-react'
+import { Clock3, FileText, LogIn, Mail, LockKeyhole, Users } from 'lucide-react'
 import { useState } from 'react'
 import LogoMark from './LogoMark.jsx'
 
@@ -13,24 +13,24 @@ export default function AuthScreen({
   socialProviders = {},
 }) {
   const [mode, setMode] = useState('login')
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [form, setForm] = useState({
     email: '',
     name: '',
     password: '',
   })
   const isSignUp = mode === 'signup'
-  const configMessage = !isConfigured ? 'Connect Supabase to enable live sign-in.' : ''
+  const configMessage = !isConfigured ? 'Sign-in is not ready yet.' : ''
   const formError = isConfigured ? error : ''
   const isCheckingSocialProviders =
     isConfigured && (socialProviders.google === null || socialProviders.x === null)
-  const disabledSocialProviders = [
-    socialProviders.google === false ? 'Google' : '',
-    socialProviders.x === false ? 'X' : '',
-  ].filter(Boolean)
+  const shouldShowGoogle = isConfigured && socialProviders.google !== false
+  const shouldShowX = isConfigured && socialProviders.x === true
+  const hasSocialOptions = shouldShowGoogle || shouldShowX
   const socialSetupMessage = isCheckingSocialProviders
-    ? 'Checking social sign-in setup.'
-    : disabledSocialProviders.length
-      ? `Enable ${disabledSocialProviders.join(' and ')} in Supabase Auth providers to use social sign-in.`
+    ? 'Checking available sign-in options...'
+    : isConfigured && socialProviders.google === false
+      ? 'Google sign-in is not available for this workspace yet.'
       : ''
 
   const updateField = (field, value) => {
@@ -47,7 +47,16 @@ export default function AuthScreen({
 
   const submitForm = async (event) => {
     event.preventDefault()
-    await onEmailAuth({ ...form, mode })
+    if (isSubmitting || !isConfigured) {
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      await onEmailAuth({ ...form, mode })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -57,31 +66,56 @@ export default function AuthScreen({
           <span className="brand-mark" aria-hidden="true">
             <LogoMark />
           </span>
+          <span>Quote workspace</span>
         </div>
 
         <div className="auth-copy">
-          <h1 id="auth-heading">{isSignUp ? 'Create your account' : 'Welcome back'}</h1>
+          <h1 id="auth-heading">
+            {isSignUp ? 'Create your Quotely account' : 'Welcome back to Quotely'}
+          </h1>
           <p>
-            {isSignUp ? 'Create access for your quote workspace.' : 'Log in to open your quote workspace.'}
+            {isSignUp
+              ? 'Create a private workspace for quotations, clients, and reusable packages.'
+              : 'Manage quotations, clients, and follow-ups in one focused workspace.'}
           </p>
           <button className="auth-mode-button" type="button" onClick={toggleMode}>
             {isSignUp ? 'Already have an account? Log in' : "Don't have an account? Sign up"}
           </button>
         </div>
 
-        <form className="auth-form" onSubmit={submitForm}>
+        <div className="auth-product-row" aria-label="Quotely workspace tools">
+          <span>
+            <FileText aria-hidden="true" />
+            Quotations
+          </span>
+          <span>
+            <Users aria-hidden="true" />
+            Clients
+          </span>
+          <span>
+            <Clock3 aria-hidden="true" />
+            Follow-ups
+          </span>
+        </div>
+
+        <form className="auth-form" aria-busy={isSubmitting} noValidate onSubmit={submitForm}>
           {isSignUp && (
             <label className="field">
               <span>Name</span>
               <input
+                aria-describedby={fieldErrors.name ? 'auth-name-error' : undefined}
                 aria-invalid={Boolean(fieldErrors.name)}
                 className={fieldErrors.name ? 'is-invalid' : undefined}
                 autoComplete="name"
                 value={form.name}
                 onChange={(event) => updateField('name', event.target.value)}
-                placeholder="Workspace owner"
+                placeholder="Your name"
               />
-              {fieldErrors.name && <small className="field-error">{fieldErrors.name}</small>}
+              {fieldErrors.name && (
+                <small className="field-error" id="auth-name-error">
+                  {fieldErrors.name}
+                </small>
+              )}
             </label>
           )}
 
@@ -90,6 +124,7 @@ export default function AuthScreen({
             <span className="auth-input-wrap">
               <Mail aria-hidden="true" />
               <input
+                aria-describedby={fieldErrors.email ? 'auth-email-error' : undefined}
                 aria-invalid={Boolean(fieldErrors.email)}
                 className={fieldErrors.email ? 'is-invalid' : undefined}
                 autoComplete="email"
@@ -99,7 +134,11 @@ export default function AuthScreen({
                 placeholder="Email address"
               />
             </span>
-            {fieldErrors.email && <small className="field-error">{fieldErrors.email}</small>}
+            {fieldErrors.email && (
+              <small className="field-error" id="auth-email-error">
+                {fieldErrors.email}
+              </small>
+            )}
           </label>
 
           <label className="field">
@@ -107,6 +146,7 @@ export default function AuthScreen({
             <span className="auth-input-wrap">
               <LockKeyhole aria-hidden="true" />
               <input
+                aria-describedby={fieldErrors.password ? 'auth-password-error' : undefined}
                 aria-invalid={Boolean(fieldErrors.password)}
                 className={fieldErrors.password ? 'is-invalid' : undefined}
                 autoComplete={isSignUp ? 'new-password' : 'current-password'}
@@ -116,45 +156,66 @@ export default function AuthScreen({
                 placeholder={isSignUp ? 'Create password' : 'Password'}
               />
             </span>
-            {fieldErrors.password && <small className="field-error">{fieldErrors.password}</small>}
+            {fieldErrors.password && (
+              <small className="field-error" id="auth-password-error">
+                {fieldErrors.password}
+              </small>
+            )}
           </label>
 
           {formError && <p className="auth-error">{formError}</p>}
           {configMessage && <p className="auth-config-message">{configMessage}</p>}
           {message && <p className="auth-message">{message}</p>}
 
-          <button className="button primary auth-submit" disabled={!isConfigured} type="submit">
+          <button
+            className="button primary auth-submit"
+            disabled={!isConfigured || isSubmitting}
+            type="submit"
+          >
             <LogIn aria-hidden="true" />
-            {isSignUp ? 'Create account' : 'Log in'}
+            {isSubmitting
+              ? isSignUp
+                ? 'Creating workspace...'
+                : 'Opening workspace...'
+              : isSignUp
+                ? 'Create workspace'
+                : 'Open workspace'}
           </button>
         </form>
 
-        <div className="auth-divider">
-          <span />
-          <strong>or</strong>
-          <span />
-        </div>
-
-        <div className="social-login-grid" aria-label="Other sign in options">
-          <button
-            className="social-login-button"
-            disabled={!isConfigured || socialProviders.google !== true}
-            type="button"
-            onClick={() => onSocialLogin('google')}
-          >
-            <span className="google-mark" aria-hidden="true" />
-            Google
-          </button>
-          <button
-            className="social-login-button"
-            disabled={!isConfigured || socialProviders.x !== true}
-            type="button"
-            onClick={() => onSocialLogin('x')}
-          >
-            <span className="x-mark" aria-hidden="true" />
-            X
-          </button>
-        </div>
+        {hasSocialOptions && (
+          <>
+            <div className="auth-divider">
+              <span />
+              <strong>or</strong>
+              <span />
+            </div>
+            <div className="social-login-grid" aria-label="Other sign in options">
+              {shouldShowGoogle && (
+                <button
+                  className="social-login-button"
+                  disabled={isSubmitting || socialProviders.google !== true}
+                  type="button"
+                  onClick={() => onSocialLogin('google')}
+                >
+                  <span className="google-mark" aria-hidden="true" />
+                  Sign in with Google
+                </button>
+              )}
+              {shouldShowX && (
+                <button
+                  className="social-login-button"
+                  disabled={isSubmitting}
+                  type="button"
+                  onClick={() => onSocialLogin('x')}
+                >
+                  <span className="x-mark" aria-hidden="true" />
+                  Sign in with X
+                </button>
+              )}
+            </div>
+          </>
+        )}
         {socialSetupMessage && <p className="auth-social-note">{socialSetupMessage}</p>}
       </section>
     </main>
