@@ -22,80 +22,16 @@ import {
   downloadQuotationHtml,
   nextQuoteNumber,
   normalizeMoney,
+  normalizeCurrency,
+  normalizeRate,
   splitLines,
 } from './utils/quotation.js'
 import './App.css'
 
-const STORAGE_VERSION = 'v1'
-const LEGACY_STORAGE_KEYS = {
-  'brand-settings': 'quotely-brand-settings',
-  quotes: 'quotely-quotes',
-}
-const WORKSPACE_STORAGE_KEYS = ['quotes', 'brand-settings', 'service-templates', 'profile-image']
-const LEGACY_WORKSPACE_OWNER_KEY = `quotely:legacy-workspace-owner:${STORAGE_VERSION}`
+const STORAGE_VERSION = 'v2'
 const EMPTY_SERVICE_TEMPLATES = []
-const DEMO_CLIENT_FIXES = {
-  'harry jay ortega': {
-    clientEmail: 'isabel.reyes@studiomarquee.co',
-    clientName: 'Isabel Reyes',
-    location: 'Makati City',
-    projectName: 'Studio Marquee Website Redesign',
-  },
-  'marco duchsand': {
-    clientEmail: 'hello@northlineevents.com',
-    clientName: 'Northline Events Co.',
-    location: 'Valencia City',
-    projectName: 'Website CMS Integration',
-  },
-  'mbappe duchsand': {
-    clientEmail: 'billing@brightpathcreative.co',
-    clientName: 'BrightPath Creative',
-    location: 'Cagayan de Oro',
-    projectName: 'Brand Identity Sprint',
-  },
-  'trsh plyr': {
-    clientEmail: 'adrian.santos@northlineevents.com',
-    clientName: 'Adrian Santos',
-    location: 'Davao City',
-    projectName: 'Event Proposal Package',
-  },
-}
-const DEMO_EMAIL_FIXES = {
-  'harry@gmail.com': 'isabel.reyes@studiomarquee.co',
-}
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-function polishServiceText(value) {
-  return String(value || '')
-    .replace(/Integrate CMS in webflow made websites/gi, 'Integrate CMS into Webflow-built websites.')
-    .replace(/\bwebflow\b/g, 'Webflow')
-    .replace(/\bwebsite redesign\b/gi, 'Website Redesign')
-}
-
-function normalizeStoredQuote(quote) {
-  const normalizedClient = String(quote.clientName || '').trim().toLowerCase()
-  const fixedClient = DEMO_CLIENT_FIXES[normalizedClient] || {}
-  const normalizedEmail = String(quote.clientEmail || '').trim().toLowerCase()
-
-  return {
-    ...quote,
-    ...fixedClient,
-    clientEmail: fixedClient.clientEmail || DEMO_EMAIL_FIXES[normalizedEmail] || quote.clientEmail,
-    packageType: polishServiceText(quote.packageType),
-    paymentTerms: polishServiceText(quote.paymentTerms),
-    projectName: fixedClient.projectName || polishServiceText(quote.projectName),
-    servicesIncluded: polishServiceText(quote.servicesIncluded),
-  }
-}
-
-function normalizeStoredService(template) {
-  return {
-    ...template,
-    description: polishServiceText(template.description),
-    name: polishServiceText(template.name),
-  }
-}
 
 function getStorageKey(key, accountId) {
   return accountId
@@ -105,16 +41,17 @@ function getStorageKey(key, accountId) {
 
 function normalizeStoredValue(key, value, fallback) {
   if (key === 'quotes' && Array.isArray(value)) {
-    return value
-      .filter((quote) => !String(quote.id || '').startsWith('seed-'))
-      .map(normalizeStoredQuote)
+    return value.filter((quote) => !String(quote.id || '').startsWith('seed-'))
   }
 
   if (key === 'service-templates' && Array.isArray(value)) {
-    return value.map(normalizeStoredService)
+    return value
   }
 
-  if (key === 'brand-settings' && value?.accentColor === '#0f9f82') {
+  if (
+    key === 'brand-settings'
+    && ['#0f9f82', '#2927e8'].includes(String(value?.accentColor || '').toLowerCase())
+  ) {
     return { ...value, accentColor: fallback.accentColor }
   }
 
@@ -129,69 +66,6 @@ function readStoredValue(key, fallback, accountId) {
     return normalizeStoredValue(key, parsedValue, fallback)
   } catch {
     return fallback
-  }
-}
-
-function getLegacyStoredValue(key) {
-  const possibleKeys = [getStorageKey(key), LEGACY_STORAGE_KEYS[key]].filter(Boolean)
-
-  for (const storageKey of possibleKeys) {
-    const storedValue = window.localStorage.getItem(storageKey)
-
-    if (storedValue) {
-      return storedValue
-    }
-  }
-
-  return null
-}
-
-function migrateLegacyWorkspace(accountId) {
-  if (!accountId) {
-    return
-  }
-
-  try {
-    const legacyOwner = window.localStorage.getItem(LEGACY_WORKSPACE_OWNER_KEY)
-
-    if (legacyOwner && legacyOwner !== accountId) {
-      return
-    }
-
-    const migrationKey = `quotely:${accountId}:legacy-migrated:${STORAGE_VERSION}`
-
-    if (window.localStorage.getItem(migrationKey)) {
-      return
-    }
-
-    const hasLegacyWorkspace = WORKSPACE_STORAGE_KEYS.some((key) => getLegacyStoredValue(key))
-
-    if (!hasLegacyWorkspace) {
-      window.localStorage.setItem(migrationKey, 'true')
-      return
-    }
-
-    if (!legacyOwner) {
-      window.localStorage.setItem(LEGACY_WORKSPACE_OWNER_KEY, accountId)
-    }
-
-    WORKSPACE_STORAGE_KEYS.forEach((key) => {
-      const accountKey = getStorageKey(key, accountId)
-
-      if (window.localStorage.getItem(accountKey)) {
-        return
-      }
-
-      const legacyValue = getLegacyStoredValue(key)
-
-      if (legacyValue) {
-        window.localStorage.setItem(accountKey, legacyValue)
-      }
-    })
-
-    window.localStorage.setItem(migrationKey, 'true')
-  } catch {
-    // localStorage can be unavailable in private browsing or quota-limited contexts.
   }
 }
 
@@ -268,6 +142,10 @@ function validateQuoteDraft(quote) {
     errors.basePrice = 'Add a package price greater than zero.'
   }
 
+  if ((quote.taxMode || 'none') !== 'none' && normalizeRate(quote.taxRate) <= 0) {
+    errors.taxRate = 'Add a tax rate or set tax to no tax.'
+  }
+
   if (!splitLines(quote.servicesIncluded).length) {
     errors.servicesIncluded = 'Add at least one included deliverable.'
   }
@@ -294,6 +172,10 @@ function normalizeDraftForSave(draft, existingId, quotes) {
     quotationNumber: draft.quotationNumber || nextQuoteNumber(quotes),
     basePrice: normalizeMoney(draft.basePrice),
     discount: normalizeMoney(draft.discount),
+    currency: normalizeCurrency(draft.currency),
+    taxMode: draft.taxMode === 'exclusive' ? 'exclusive' : 'none',
+    taxLabel: String(draft.taxLabel || 'VAT').trim() || 'VAT',
+    taxRate: normalizeRate(draft.taxRate),
     addOns: visibleAddOns.length ? visibleAddOns : [{ name: '', price: 0 }],
     createdAt: draft.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -317,8 +199,6 @@ function ToastViewport({ toast }) {
 
 function SecureWorkspace({ account, onLogout, showFeedback }) {
   const accountId = account?.id
-
-  migrateLegacyWorkspace(accountId)
 
   const [quotes, setQuotes] = usePersistedState('quotes', initialQuotes, accountId)
   const [settings, setSettings] = usePersistedState(
@@ -427,6 +307,10 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
     setDraftQuote({
       ...quote,
       addOns: quote.addOns?.length ? quote.addOns : [{ name: '', price: 0 }],
+      currency: normalizeCurrency(quote.currency),
+      taxMode: quote.taxMode === 'exclusive' ? 'exclusive' : 'none',
+      taxLabel: quote.taxLabel || 'VAT',
+      taxRate: normalizeRate(quote.taxRate),
     })
     setActiveSection('create')
   }
@@ -892,7 +776,7 @@ function App() {
     setSession(null)
     setAuthError('')
     setAuthFieldErrors({})
-    setAuthMessage('You have been logged out of Quotely.')
+    setAuthMessage("Signed out. Log in again when you're ready.")
     showFeedback('Logged out', 'This browser no longer has access to your workspace.')
   }
 

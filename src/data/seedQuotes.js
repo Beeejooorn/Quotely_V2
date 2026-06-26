@@ -1,15 +1,15 @@
 export const defaultSettings = {
-  businessName: 'Quotely Studio',
-  businessEmail: 'hello@quotely.ph',
-  businessPhone: '+63 917 555 0148',
-  businessAddress: 'Makati City, Philippines',
+  businessName: '',
+  businessEmail: '',
+  businessPhone: '',
+  businessAddress: '',
   registrationNumber: '',
   businessLogo: '',
   paymentMethod: '',
   paymentDetails: '',
   defaultPaymentTerms: '',
   defaultValidityDays: 14,
-  accentColor: '#2927e8',
+  accentColor: '#3730a3',
 }
 
 export const initialQuotes = []

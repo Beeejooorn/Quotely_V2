@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import StatusBadge from './StatusBadge.jsx'
 import {
   calculateQuote,
+  formatMoney,
   formatDate,
   peso,
   STATUS_OPTIONS,
@@ -203,7 +204,9 @@ export default function SavedQuotes({
                         </div>
                       </td>
                       <td>
-                        <strong className="quote-table-amount">{peso(calculateQuote(quote).total)}</strong>
+                        <strong className="quote-table-amount">
+                          {formatMoney(calculateQuote(quote).total, quote.currency)}
+                        </strong>
                       </td>
                       <td>
                         <select
@@ -225,7 +228,7 @@ export default function SavedQuotes({
                       </td>
                       <td>
                         <div className="quote-date-stack">
-                          <span>Expires {formatDate(quote.validityDate)}</span>
+                          <span>Exp {formatDate(quote.validityDate)}</span>
                           <small>Updated {formatDate(quote.updatedAt || quote.createdAt)}</small>
                         </div>
                       </td>
@@ -287,7 +290,7 @@ export default function SavedQuotes({
                       </span>
                       <span className="quote-meta">Expires {formatDate(quote.validityDate)}</span>
                       <strong className="quote-card-total">
-                        {peso(calculateQuote(quote).total)}
+                        {formatMoney(calculateQuote(quote).total, quote.currency)}
                       </strong>
                     </div>
                     <label className="field quote-card-status">

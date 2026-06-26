@@ -1,8 +1,11 @@
 import { Plus, RotateCcw, Save, Trash2 } from 'lucide-react'
 import {
+  CURRENCY_OPTIONS,
   STATUS_OPTIONS,
+  TAX_MODE_OPTIONS,
+  formatMoney,
   normalizeMoney,
-  peso,
+  normalizeRate,
 } from '../utils/quotation.js'
 
 export default function QuoteBuilder({
@@ -76,7 +79,7 @@ export default function QuoteBuilder({
         <section className="form-section">
           <div className="form-section-heading">
             <h3><span>1</span> Client details</h3>
-            <p>Client, project, date, and location for this quotation.</p>
+            <p>Who the quotation is for.</p>
           </div>
           <div className="form-grid">
             <label className="field">
@@ -111,7 +114,6 @@ export default function QuoteBuilder({
                 onChange={(event) => updateField('projectName', event.target.value)}
                 placeholder="Corporate Year-End Party"
               />
-              <small className="field-help">This appears as the main project line in the preview.</small>
               {errors.projectName && <small className="field-error">{errors.projectName}</small>}
             </label>
             <label className="field">
@@ -142,7 +144,7 @@ export default function QuoteBuilder({
         <section className="form-section">
           <div className="form-section-heading">
             <h3><span>2</span> Package and pricing</h3>
-            <p>Apply a reusable package or price a custom service for this client.</p>
+            <p>Package, deliverables, currency, and tax.</p>
           </div>
           <div className="form-grid">
             {serviceTemplates.length > 0 && (
@@ -155,7 +157,7 @@ export default function QuoteBuilder({
                   <option value="">Choose a reusable package</option>
                   {serviceTemplates.map((template) => (
                     <option key={template.id} value={template.id}>
-                      {template.name} - {peso(template.price)}
+                      {template.name} - {formatMoney(template.price, quote.currency)}
                     </option>
                   ))}
                 </select>
@@ -201,15 +203,69 @@ export default function QuoteBuilder({
                 <small className="field-error">{errors.servicesIncluded}</small>
               )}
             </label>
+            <label className="field">
+              <span>Currency</span>
+              <select
+                value={quote.currency || 'PHP'}
+                onChange={(event) => updateField('currency', event.target.value)}
+              >
+                {CURRENCY_OPTIONS.map((currency) => (
+                  <option key={currency.code} value={currency.code}>
+                    {currency.label}
+                  </option>
+                ))}
+              </select>
+              <small className="field-help">Choose the currency shown on the client quotation.</small>
+            </label>
+            <label className="field">
+              <span>Tax/VAT</span>
+              <select
+                value={quote.taxMode || 'none'}
+                onChange={(event) => updateField('taxMode', event.target.value)}
+              >
+                {TAX_MODE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <small className="field-help">Choose no tax or add tax/VAT to the final client total.</small>
+            </label>
+            {(quote.taxMode || 'none') !== 'none' && (
+              <>
+                <label className="field">
+                  <span>Tax label</span>
+                  <input
+                    value={quote.taxLabel || 'VAT'}
+                    onChange={(event) => updateField('taxLabel', event.target.value)}
+                    placeholder="VAT"
+                  />
+                </label>
+                <label className="field">
+                  <span>Tax rate (%)</span>
+                  <input
+                    aria-invalid={Boolean(errors.taxRate)}
+                    className={errors.taxRate ? 'is-invalid' : undefined}
+                    min="0"
+                    max="100"
+                    type="number"
+                    value={quote.taxRate || 0}
+                    onChange={(event) => updateField('taxRate', normalizeRate(event.target.value))}
+                  />
+                  <small className="field-help">Philippine VAT is commonly 12% when applicable.</small>
+                  {errors.taxRate && <small className="field-error">{errors.taxRate}</small>}
+                </label>
+              </>
+            )}
           </div>
 
           <div className="addons-list">
             <div className="addons-heading">
               <span className="field-label">Add-ons</span>
-              <small>Optional extras listed after the main package.</small>
+              <small>Optional extras after the main package.</small>
             </div>
             {quote.addOns.map((item, index) => (
-              <div className="addon-row" key={`${index}-${item.name}`}>
+              <div className="addon-row" key={item.id || `addon-${index}`}>
                 <input
                   aria-label={`Add-on ${index + 1} name`}
                   value={item.name}
@@ -245,7 +301,7 @@ export default function QuoteBuilder({
         <section className="form-section">
           <div className="form-section-heading">
             <h3><span>3</span> Terms and validity</h3>
-            <p>Set payment expectations, quote status, and expiry date.</p>
+            <p>Payment, status, and expiry.</p>
           </div>
           <div className="form-grid">
             <label className="field">
@@ -256,7 +312,6 @@ export default function QuoteBuilder({
                 value={quote.discount}
                 onChange={(event) => updateField('discount', normalizeMoney(event.target.value))}
               />
-              <small className="field-help">Shown as a deduction in the amount breakdown.</small>
             </label>
             <label className="field">
               <span>Status</span>
@@ -270,7 +325,6 @@ export default function QuoteBuilder({
                   </option>
                 ))}
               </select>
-              <small className="field-help">Use Draft while preparing, then Sent or Pending after sharing.</small>
             </label>
             <label className="field">
               <span>Valid until</span>
@@ -293,7 +347,6 @@ export default function QuoteBuilder({
                 onChange={(event) => updateField('paymentTerms', event.target.value)}
                 placeholder="Example: 50% down payment, balance due before delivery."
               />
-              <small className="field-help">Keep it short so clients understand the payment step.</small>
               {errors.paymentTerms && <small className="field-error">{errors.paymentTerms}</small>}
             </label>
             <label className="field span-2">
@@ -303,7 +356,6 @@ export default function QuoteBuilder({
                 onChange={(event) => updateField('notes', event.target.value)}
                 placeholder="Add delivery notes, exclusions, or approval reminders."
               />
-              <small className="field-help">Optional notes, exclusions, or approval reminders for this quote.</small>
             </label>
           </div>
         </section>
@@ -311,40 +363,42 @@ export default function QuoteBuilder({
         <section className="form-section preview-export-section">
           <div className="form-section-heading">
             <h3><span>4</span> Preview and export</h3>
-            <p>Review the client-facing document, then save before printing or downloading.</p>
+            <p>Check the calculated total before saving.</p>
           </div>
-          <div className="preview-export-card">
-            <span>{quote.quotationNumber}</span>
-            <strong>{peso(totals.total)}</strong>
-            <p>Live quote total</p>
+          <div className="total-strip" aria-live="polite">
+            <div className="total-strip-header">
+              <div>
+                <h3>Quotation total</h3>
+                <p>Package price, add-ons, discount, and tax.</p>
+              </div>
+              <span>{quote.quotationNumber}</span>
+            </div>
+            <div className="total-line">
+              <span>Base package</span>
+              <strong>{formatMoney(totals.basePrice, quote.currency)}</strong>
+            </div>
+            <div className="total-line">
+              <span>Add-ons</span>
+              <strong>{formatMoney(totals.addOnsTotal, quote.currency)}</strong>
+            </div>
+            <div className="total-line">
+              <span>Discount</span>
+              <strong>-{formatMoney(totals.discount, quote.currency)}</strong>
+            </div>
+            {(quote.taxMode || 'none') !== 'none' && (
+              <div className="total-line">
+                <span>
+                  {quote.taxLabel || 'VAT'} {totals.taxRate}%
+                </span>
+                <strong>{formatMoney(totals.taxAmount, quote.currency)}</strong>
+              </div>
+            )}
+            <div className="total-line final">
+              <span>Final total</span>
+              <strong>{formatMoney(totals.total, quote.currency)}</strong>
+            </div>
           </div>
         </section>
-
-        <div className="total-strip" aria-live="polite">
-          <div className="total-strip-header">
-            <div>
-              <h3>Quotation total</h3>
-              <p>Calculated from package price, add-ons, and discount.</p>
-            </div>
-            <span>{quote.quotationNumber}</span>
-          </div>
-          <div className="total-line">
-            <span>Base package</span>
-            <strong>{peso(totals.basePrice)}</strong>
-          </div>
-          <div className="total-line">
-            <span>Add-ons</span>
-            <strong>{peso(totals.addOnsTotal)}</strong>
-          </div>
-          <div className="total-line">
-            <span>Discount</span>
-            <strong>-{peso(totals.discount)}</strong>
-          </div>
-          <div className="total-line final">
-            <span>Final total</span>
-            <strong>{peso(totals.total)}</strong>
-          </div>
-        </div>
 
         <div className="form-actions">
           <button className="button secondary" type="button" onClick={onNew}>

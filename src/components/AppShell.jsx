@@ -1,23 +1,23 @@
 import {
+  BriefcaseBusiness,
   FileText,
+  FilePenLine,
   LayoutDashboard,
-  LibraryBig,
   PackageCheck,
   Plus,
-  Settings,
   UserRound,
 } from 'lucide-react'
 import LogoMark from './LogoMark.jsx'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'create', label: 'New Quote', icon: FileText },
-  { id: 'saved', label: 'Quotations', icon: LibraryBig },
+  { id: 'create', label: 'Create quotation', icon: FilePenLine },
+  { id: 'saved', label: 'Quotations', icon: FileText },
   { id: 'services', label: 'Service Library', icon: PackageCheck },
 ]
 
 const utilityItems = [
-  { id: 'settings', label: 'Business Settings', icon: Settings },
+  { id: 'settings', label: 'Business Details', icon: BriefcaseBusiness },
 ]
 
 const mobileUtilityItems = [
@@ -28,10 +28,12 @@ const mobileUtilityItems = [
 function NavButton({ activeSection, item, onNavigate }) {
   const Icon = item.icon
   const isActive = activeSection === item.id
+  const tooltipId = `nav-tooltip-${item.id}`
 
   return (
     <button
       aria-current={isActive ? 'page' : undefined}
+      aria-describedby={tooltipId}
       aria-label={item.label}
       className={`nav-button ${isActive ? 'active' : ''}`}
       type="button"
@@ -39,7 +41,7 @@ function NavButton({ activeSection, item, onNavigate }) {
       onClick={() => onNavigate(item.id)}
     >
       <Icon aria-hidden="true" />
-      <span>{item.label}</span>
+      <span id={tooltipId} role="tooltip">{item.label}</span>
     </button>
   )
 }
@@ -86,6 +88,7 @@ export default function AppShell({
         <nav className="nav-list nav-list-bottom" aria-label="Workspace settings">
           <button
             aria-current={activeSection === 'profile' ? 'page' : undefined}
+            aria-describedby="nav-tooltip-profile"
             aria-label="Profile and account"
             className={`profile-rail-button ${uploadedProfileImage ? 'has-image' : ''} ${
               activeSection === 'profile' ? 'active' : ''
@@ -101,7 +104,9 @@ export default function AppShell({
                 <span className="profile-initial">{profileName.slice(0, 1).toUpperCase()}</span>
               )}
             </span>
-            <span className="rail-tooltip">Profile and account</span>
+            <span className="rail-tooltip" id="nav-tooltip-profile" role="tooltip">
+              Profile and account
+            </span>
           </button>
           {utilityItems.map((item) => (
             <NavButton

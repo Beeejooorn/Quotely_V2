@@ -78,9 +78,6 @@ export default function AuthScreen({
               ? 'Create a private workspace for quotations, clients, and reusable packages.'
               : 'Manage quotations, clients, and follow-ups in one focused workspace.'}
           </p>
-          <button className="auth-mode-button" type="button" onClick={toggleMode}>
-            {isSignUp ? 'Already have an account? Log in' : "Don't have an account? Sign up"}
-          </button>
         </div>
 
         <div className="auth-product-row" aria-label="Quotely workspace tools">
@@ -175,11 +172,11 @@ export default function AuthScreen({
             <LogIn aria-hidden="true" />
             {isSubmitting
               ? isSignUp
-                ? 'Creating workspace...'
-                : 'Opening workspace...'
+                ? 'Creating account...'
+                : 'Logging in...'
               : isSignUp
-                ? 'Create workspace'
-                : 'Open workspace'}
+                ? 'Create account'
+                : 'Log in to workspace'}
           </button>
         </form>
 
@@ -217,6 +214,12 @@ export default function AuthScreen({
           </>
         )}
         {socialSetupMessage && <p className="auth-social-note">{socialSetupMessage}</p>}
+        <div className="auth-secondary-action">
+          <span>{isSignUp ? 'Already have an account?' : 'New to Quotely?'}</span>
+          <button className="auth-mode-button" type="button" onClick={toggleMode}>
+            {isSignUp ? 'Log in' : 'Create an account'}
+          </button>
+        </div>
       </section>
     </main>
   )

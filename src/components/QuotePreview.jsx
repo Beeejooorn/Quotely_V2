@@ -1,7 +1,7 @@
 import { Download, Printer } from 'lucide-react'
 import StatusBadge from './StatusBadge.jsx'
 import LogoMark from './LogoMark.jsx'
-import { formatDate, peso, splitLines, visibleAddOns } from '../utils/quotation.js'
+import { formatDate, formatMoney, splitLines, statusClass, visibleAddOns } from '../utils/quotation.js'
 
 export default function QuotePreview({
   helperText = 'Review the client-facing quote before printing or downloading.',
@@ -20,6 +20,12 @@ export default function QuotePreview({
   const paymentTerms = quote.paymentTerms || settings.defaultPaymentTerms
   const clientName = quote.clientName || 'Client name'
   const projectName = quote.projectName || 'Project name'
+  const businessName = settings.businessName?.trim() || 'Quotely Studio'
+  const preparedByName = settings.businessName?.trim() || 'Quotely Quotation Studio'
+  const quoteStatusClass = statusClass(quote.status)
+  const currency = quote.currency || 'PHP'
+  const taxMode = quote.taxMode || 'none'
+  const taxLabel = quote.taxLabel || 'VAT'
 
   return (
     <section className="preview-panel" aria-labelledby="preview-heading">
@@ -55,13 +61,14 @@ export default function QuotePreview({
               </span>
             )}
             <div className="document-brand-copy">
-              <h2>{settings.businessName || 'Quotely'}</h2>
+              <span className="document-brand-kicker">Quotation prepared by</span>
+              <h2>{businessName}</h2>
               {settings.businessEmail && <p>{settings.businessEmail}</p>}
               {businessContact && <p>{businessContact}</p>}
               {settings.registrationNumber && <p>{settings.registrationNumber}</p>}
             </div>
           </div>
-          <div className="document-meta">
+          <div className={`document-meta status-${quoteStatusClass}`}>
             <span className="document-eyebrow">Quotation</span>
             <strong>{quote.quotationNumber}</strong>
             <p>Issued {formatDate(quote.createdAt)}</p>
@@ -71,6 +78,12 @@ export default function QuotePreview({
           </div>
         </header>
 
+        <div className="document-reference-row" aria-label="Quotation reference details">
+          <span>Client copy</span>
+          <span>Quote ref: {quote.quotationNumber}</span>
+          <span>Valid until {formatDate(quote.validityDate)}</span>
+        </div>
+
         <section className="document-intro" aria-label="Quotation summary">
           <div>
             <span className="document-eyebrow">Prepared for</span>
@@ -79,7 +92,7 @@ export default function QuotePreview({
           </div>
           <div className="document-hero-total">
             <span>Total amount</span>
-            <strong>{peso(totals.total)}</strong>
+            <strong>{formatMoney(totals.total, currency)}</strong>
           </div>
         </section>
 
@@ -102,14 +115,14 @@ export default function QuotePreview({
         <section className="document-section">
           <div className="document-section-heading">
             <h3>Services and deliverables</h3>
-            <span>{quote.packageType || 'Custom'} package</span>
+            <span>Package: {quote.packageType || 'Custom'}</span>
           </div>
           <div className="document-package-card">
             <div>
               <span>Package</span>
               <strong>{quote.packageType || 'Custom package'}</strong>
             </div>
-            <strong className="document-package-price">{peso(totals.basePrice)}</strong>
+            <strong className="document-package-price">{formatMoney(totals.basePrice, currency)}</strong>
           </div>
           <ul className="service-list">
             {services.length ? (
@@ -133,12 +146,12 @@ export default function QuotePreview({
               <tbody>
                 <tr>
                   <td>{quote.packageType || 'Custom'} package</td>
-                  <td>{peso(totals.basePrice)}</td>
+                  <td>{formatMoney(totals.basePrice, currency)}</td>
                 </tr>
                 {addOns.map((item) => (
                   <tr key={`${item.name}-${item.price}`}>
                     <td>{item.name || 'Add-on'}</td>
-                    <td>{peso(item.price)}</td>
+                    <td>{formatMoney(item.price, currency)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -148,15 +161,23 @@ export default function QuotePreview({
           <div className="document-summary">
             <div className="total-line">
               <span>Subtotal</span>
-              <strong>{peso(totals.subtotal)}</strong>
+              <strong>{formatMoney(totals.subtotal, currency)}</strong>
             </div>
             <div className="total-line">
               <span>Discount</span>
-              <strong>-{peso(totals.discount)}</strong>
+              <strong>-{formatMoney(totals.discount, currency)}</strong>
             </div>
+            {taxMode !== 'none' && (
+              <div className="total-line">
+                <span>
+                  {taxLabel} {totals.taxRate}%
+                </span>
+                <strong>{formatMoney(totals.taxAmount, currency)}</strong>
+              </div>
+            )}
             <div className="document-total">
               <span>Total amount</span>
-              <strong>{peso(totals.total)}</strong>
+              <strong>{formatMoney(totals.total, currency)}</strong>
             </div>
           </div>
         </section>
@@ -178,20 +199,23 @@ export default function QuotePreview({
           </div>
         </footer>
 
-        <section className="document-approval" aria-label="Quotation approval">
+        <section className="document-prepared" aria-label="Quotation prepared by">
           <div>
-            <span>Prepared by</span>
-            <strong>{settings.businessName || 'Quotely'}</strong>
+            <span>Issued by</span>
+            <strong>{preparedByName}</strong>
+            {(settings.businessEmail || settings.businessPhone) && (
+              <p>{[settings.businessEmail, settings.businessPhone].filter(Boolean).join(' | ')}</p>
+            )}
           </div>
-          <div>
-            <span>Client approval</span>
-            <strong>Signature and date</strong>
+          <div className="document-approval-note">
+            <span>Acceptance note</span>
+            <p>To approve this quotation, reply with confirmation before work begins.</p>
           </div>
         </section>
 
         <div className="document-closing">
           <p>
-            Thank you for considering {settings.businessName || 'Quotely'} for this work.
+            Thank you for considering {businessName} for this work.
           </p>
         </div>
       </article>

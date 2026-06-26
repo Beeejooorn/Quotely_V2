@@ -7,7 +7,6 @@ import {
   PackageCheck,
   Plus,
   Save,
-  Tag,
   Trash2,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -116,7 +115,7 @@ export default function ServiceLibrary({ onDelete, onSave, services }) {
           <div className="panel-header compact">
             <div>
               <h2>{draftService.id ? 'Edit reusable package' : 'Create reusable package'}</h2>
-              <p>Save repeatable work once, then apply it when a quotation needs it.</p>
+              <p>Build a reusable offer for future quotations.</p>
             </div>
             <PackageCheck aria-hidden="true" />
           </div>
@@ -131,7 +130,7 @@ export default function ServiceLibrary({ onDelete, onSave, services }) {
                   placeholder="Website launch package"
                 />
                 <small className="field-help">
-                  Use the package name you want clients to see in quotations.
+                  This name appears in client quotations.
                 </small>
               </label>
 
@@ -155,7 +154,7 @@ export default function ServiceLibrary({ onDelete, onSave, services }) {
                 placeholder="Discovery call&#10;Homepage design&#10;Responsive development"
               />
               <small className="field-help">
-                Add one deliverable per line so it drops cleanly into quotation previews.
+                One deliverable per line.
               </small>
             </label>
 
@@ -186,7 +185,7 @@ export default function ServiceLibrary({ onDelete, onSave, services }) {
             {services.length ? (
               services.map((service) => {
                 const includedItems = getServiceLines(service)
-                const visibleItems = includedItems.slice(0, 3)
+                const visibleItems = includedItems.slice(0, 2)
                 const extraItemCount = Math.max(includedItems.length - visibleItems.length, 0)
 
                 return (
@@ -194,7 +193,6 @@ export default function ServiceLibrary({ onDelete, onSave, services }) {
                     <div className="service-card-main">
                       <div className="service-card-meta">
                         <span className="service-template-tag">
-                          <Tag aria-hidden="true" />
                           {getServiceCategory(service)}
                         </span>
                         {service.updatedAt && (
@@ -207,7 +205,6 @@ export default function ServiceLibrary({ onDelete, onSave, services }) {
 
                       <div className="service-card-title">
                         <strong>{service.name}</strong>
-                        <span>{peso(service.price)}</span>
                       </div>
 
                       <div className="service-card-includes">
@@ -228,24 +225,27 @@ export default function ServiceLibrary({ onDelete, onSave, services }) {
                       </div>
                     </div>
 
-                    <div className="service-card-actions">
-                      <button
-                        className="button secondary compact-button"
-                        type="button"
-                        onClick={() => setDraftService(service)}
-                      >
-                        <Edit3 aria-hidden="true" />
-                        Edit
-                      </button>
-                      <button
-                        className="icon-button danger"
-                        aria-label={`Delete ${service.name}`}
-                        type="button"
-                        title="Delete service"
-                        onClick={() => onDelete(service.id)}
-                      >
-                        <Trash2 aria-hidden="true" />
-                      </button>
+                    <div className="service-card-side">
+                      <span className="service-card-price">{peso(service.price)}</span>
+                      <div className="service-card-actions">
+                        <button
+                          className="button secondary compact-button"
+                          type="button"
+                          onClick={() => setDraftService(service)}
+                        >
+                          <Edit3 aria-hidden="true" />
+                          Edit
+                        </button>
+                        <button
+                          className="icon-button danger"
+                          aria-label={`Delete ${service.name}`}
+                          type="button"
+                          title="Delete service"
+                          onClick={() => onDelete(service.id)}
+                        >
+                          <Trash2 aria-hidden="true" />
+                        </button>
+                      </div>
                     </div>
                   </article>
                 )

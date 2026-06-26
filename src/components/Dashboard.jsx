@@ -8,10 +8,10 @@ import {
   Send,
   Users,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import StatCard from './StatCard.jsx'
 import StatusBadge from './StatusBadge.jsx'
-import { calculateQuote, formatDate, peso, splitLines, STATUS_OPTIONS } from '../utils/quotation.js'
+import { calculateQuote, formatDate, formatMoney, peso, splitLines, STATUS_OPTIONS } from '../utils/quotation.js'
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -56,6 +56,13 @@ function getFollowUpQuotes(quotes) {
     .filter((quote) => ['Sent', 'Pending'].includes(quote.status))
     .sort((a, b) => new Date(a.validityDate) - new Date(b.validityDate))
     .slice(0, 3)
+}
+
+function getDeadlineQuotes(quotes) {
+  return [...quotes]
+    .filter((quote) => quote.status !== 'Rejected' && parseDateOnly(quote.validityDate))
+    .sort((a, b) => parseDateOnly(a.validityDate) - parseDateOnly(b.validityDate))
+    .slice(0, 6)
 }
 
 function getCalendarMonth(quotes) {
@@ -134,6 +141,7 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
   const [selectedCalendarQuote, setSelectedCalendarQuote] = useState(null)
   const [selectedCalendarCell, setSelectedCalendarCell] = useState(null)
   const [isCalendarPreviewClosing, setIsCalendarPreviewClosing] = useState(false)
+  const [isCalendarExpanded, setIsCalendarExpanded] = useState(false)
   const calendarCloseTimerRef = useRef(null)
   const calendarPreviewRef = useRef(null)
   const stats = buildStats(quotes)
@@ -144,6 +152,7 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
   const followUpQuotes = getFollowUpQuotes(quotes)
   const focusQuote = followUpQuotes[0]
   const focusDays = focusQuote ? getDaysUntil(focusQuote.validityDate) : null
+  const deadlineQuotes = useMemo(() => getDeadlineQuotes(quotes), [quotes])
   const calendarMonth = getCalendarMonth(quotes)
   const calendarCells = getCalendarCells(calendarMonth, quotes)
   const calendarLabel = calendarMonth.toLocaleDateString('en-US', {
@@ -232,6 +241,15 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
     }
   }
 
+  const toggleCalendarExpanded = () => {
+    setIsCalendarExpanded((current) => !current)
+    if (selectedCalendarQuote) {
+      setSelectedCalendarQuote(null)
+      setSelectedCalendarCell(null)
+      setIsCalendarPreviewClosing(false)
+    }
+  }
+
   const renderCalendarPopover = () => {
     if (!selectedCalendarQuote) {
       return null
@@ -258,7 +276,7 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
 
         <div className="calendar-popover-total">
           <span>Total amount</span>
-          <strong>{peso(selectedCalendarTotal)}</strong>
+          <strong>{formatMoney(selectedCalendarTotal, selectedCalendarQuote.currency)}</strong>
         </div>
 
         <dl className="calendar-popover-details">
@@ -297,7 +315,7 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
           <button className="button secondary" type="button" onClick={closeCalendarQuote}>
             Close
           </button>
-          <button className="button primary" type="button" onClick={viewCalendarQuote}>
+          <button className="button secondary" type="button" onClick={viewCalendarQuote}>
             View full quotation
           </button>
         </div>
@@ -323,7 +341,7 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
 
       <article className="dashboard-focus panel">
         <div>
-          <span className="focus-label">Today&apos;s focus</span>
+          <span className="focus-label">Quote desk</span>
           {focusQuote ? (
             <>
               <h2>{focusQuote.clientName || 'Client follow-up'}</h2>
@@ -339,13 +357,13 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
               <div className="focus-meta" aria-label="Focused quotation details">
                 <span>{focusQuote.quotationNumber}</span>
                 <span>{focusQuote.projectName || 'Untitled project'}</span>
-                <span>{peso(calculateQuote(focusQuote).total)}</span>
+                <span>{formatMoney(calculateQuote(focusQuote).total, focusQuote.currency)}</span>
               </div>
             </>
           ) : (
             <>
-              <h2>No urgent follow-ups</h2>
-              <p>No sent or pending quotations need attention right now.</p>
+              <h2>No client replies due</h2>
+              <p>Your sent and pending quotations are clear for now.</p>
             </>
           )}
         </div>
@@ -360,7 +378,7 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
             </a>
           )}
           <button
-            className="button primary"
+            className="button secondary"
             type="button"
             onClick={() => (focusQuote ? onView(focusQuote) : onNavigate('saved'))}
           >
@@ -408,11 +426,11 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
         <article className="panel activity-panel">
           <div className="panel-header">
             <div>
-              <h2>Recent activity</h2>
-              <p>Recent quotation changes and client-ready records.</p>
+              <h2>Quotation timeline</h2>
+              <p>Recent quote records, status changes, and client-ready updates.</p>
             </div>
             <button className="button secondary" type="button" onClick={onCreate}>
-              New quotation
+              Prepare quotation
             </button>
           </div>
 
@@ -423,14 +441,14 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
                   <span className="activity-marker" aria-hidden="true" />
                   <span className="activity-main">
                     <span>
-                      <span className="activity-type">Quotation</span>
+                      <span className="activity-type">Quote record</span>
                       <span className="quote-id-chip compact">{quote.quotationNumber}</span>
                     </span>
                     <strong>{quote.clientName || 'Unnamed client'}</strong>
                     <small>{quote.projectName || 'Untitled project'}</small>
                   </span>
                   <span className="activity-side">
-                    <strong>{peso(calculateQuote(quote).total)}</strong>
+                    <strong>{formatMoney(calculateQuote(quote).total, quote.currency)}</strong>
                     <span>
                       <StatusBadge status={quote.status} />
                       <small>{formatDate(quote.createdAt)}</small>
@@ -451,8 +469,8 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
         <article className="panel attention-panel">
           <div className="panel-header">
             <div>
-              <h2>Needs attention</h2>
-              <p>Sent and pending quotations closest to expiry.</p>
+              <h2>Client follow-ups</h2>
+              <p>Sent and pending quotations closest to their validity date.</p>
             </div>
           </div>
           <div className="attention-list">
@@ -492,8 +510,8 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
       <article className="panel status-panel">
         <div className="panel-header compact">
           <div>
-            <h2>Status summary</h2>
-            <p>Quick count of every quote by status.</p>
+            <h2>Quote pipeline</h2>
+            <p>Where each quotation currently sits before client approval.</p>
           </div>
         </div>
         <div className="dashboard-status-strip">
@@ -506,79 +524,141 @@ export default function Dashboard({ onCreate, onNavigate, onView, quotes }) {
         </div>
       </article>
 
-      <article className="panel calendar-panel">
+      <article className={`panel calendar-panel ${isCalendarExpanded ? 'is-expanded' : ''}`}>
         <div className="panel-header">
           <div>
             <h2>Upcoming expiry dates</h2>
-            <p>Calendar view of quote validity dates.</p>
+            <p>Quote deadlines that may need a follow-up soon.</p>
           </div>
-          <span className="calendar-month">
-            <CalendarDays aria-hidden="true" />
-            {calendarLabel}
-          </span>
+          <div className="calendar-header-actions">
+            <span className="calendar-month">
+              <CalendarDays aria-hidden="true" />
+              {calendarLabel}
+            </span>
+            <button
+              className="button secondary calendar-toggle"
+              type="button"
+              aria-expanded={isCalendarExpanded}
+              onClick={toggleCalendarExpanded}
+            >
+              {isCalendarExpanded ? 'Hide month view' : 'Show month view'}
+            </button>
+          </div>
         </div>
 
-        <div className="quotation-calendar" aria-label={`${calendarLabel} quotation deadlines`}>
-          <div className="calendar-weekdays" aria-hidden="true">
-            {WEEKDAYS.map((day) => (
-              <span key={day}>{day}</span>
-            ))}
-          </div>
-          <div className="calendar-grid">
-            {calendarCells.map((cell, index) => {
-              const cellWithColumn = { ...cell, column: (index % 7) + 1 }
-              const isSelected = selectedCalendarQuote
-                && cell.quotes.some((quote) => quote.id === selectedCalendarQuote.id)
+        <div className="deadline-overview" aria-label="Upcoming quotation expiry dates">
+          {deadlineQuotes.length ? (
+            deadlineQuotes.map((quote) => {
+              const days = getDaysUntil(quote.validityDate)
 
               return (
-                <div
-                  className={`calendar-cell ${isSelected ? 'has-popover' : ''}`}
-                  key={cell.isoDate}
+                <button
+                  className="deadline-row"
+                  key={quote.id}
+                  type="button"
+                  onClick={() => onView(quote)}
                 >
-                  <button
-                    className={`calendar-day ${cell.isCurrentMonth ? '' : 'muted'} ${
-                      cell.quotes.length ? 'has-quotes' : ''
-                    } ${isSelected ? 'is-selected' : ''}`}
-                    disabled={!cell.quotes.length}
-                    aria-label={
-                      cell.quotes.length
-                        ? `${cell.quotes.length} quotation${cell.quotes.length === 1 ? '' : 's'} expiring on ${formatDate(cell.isoDate)}`
-                        : `${formatDate(cell.isoDate)} has no quotation expiry`
-                    }
-                    type="button"
-                    onClick={() => cell.quotes[0] && openCalendarQuote(cell.quotes[0], cellWithColumn)}
-                  >
-                    <span className="calendar-date-row">
-                      <span className="calendar-date">{cell.date.getDate()}</span>
-                      {cell.quotes.length ? (
-                        <span className="calendar-count">{cell.quotes.length}</span>
-                      ) : null}
-                    </span>
-                    <span className="calendar-deadlines">
-                      {cell.quotes.slice(0, 2).map((quote) => (
-                        <span className="calendar-quote" key={quote.id}>
-                          <span className="calendar-quote-top">
-                            <span className="quote-id-chip compact">{quote.quotationNumber}</span>
-                            <span className={`calendar-status-dot status-${quote.status.toLowerCase()}`} />
-                          </span>
-                          <span className="calendar-client">{quote.clientName || 'Unnamed client'}</span>
-                          <span className="calendar-amount">{peso(calculateQuote(quote).total)}</span>
-                        </span>
-                      ))}
-                      {cell.quotes.length > 2 ? (
-                        <span className="calendar-more">+{cell.quotes.length - 2} more</span>
-                      ) : null}
-                      {!cell.quotes.length && cell.isCurrentMonth ? (
-                        <span className="calendar-empty-note">No expiry</span>
-                      ) : null}
-                    </span>
-                  </button>
-                  {isSelected ? renderCalendarPopover() : null}
-                </div>
+                  <span className="deadline-main">
+                    <span className="quote-id-chip compact">{quote.quotationNumber}</span>
+                    <strong>{quote.clientName || 'Unnamed client'}</strong>
+                    <small>{quote.projectName || 'Untitled project'}</small>
+                  </span>
+                  <span className="deadline-date">
+                    <strong>{formatDate(quote.validityDate)}</strong>
+                    <small>{getDeadlineLabel(quote.validityDate)}</small>
+                  </span>
+                  <span className="deadline-value">
+                    <strong>{formatMoney(calculateQuote(quote).total, quote.currency)}</strong>
+                    <small>
+                      {days !== null && days < 0
+                        ? 'Past due'
+                        : days === 0
+                          ? 'Due today'
+                          : days === 1
+                            ? '1 day left'
+                            : `${days ?? 0} days left`}
+                    </small>
+                  </span>
+                  <span className="deadline-status">
+                    <StatusBadge status={quote.status} />
+                    <small>Open</small>
+                  </span>
+                </button>
               )
-            })}
-          </div>
+            })
+          ) : (
+            <div className="deadline-empty">
+              <strong>No expiry dates scheduled</strong>
+              <span>Saved quotations with validity dates will appear here.</span>
+            </div>
+          )}
         </div>
+
+        {isCalendarExpanded ? (
+          <div className="quotation-calendar" aria-label={`${calendarLabel} quotation deadlines`}>
+            <div className="calendar-weekdays" aria-hidden="true">
+              {WEEKDAYS.map((day) => (
+                <span key={day}>{day}</span>
+              ))}
+            </div>
+            <div className="calendar-grid">
+              {calendarCells.map((cell, index) => {
+                const cellWithColumn = { ...cell, column: (index % 7) + 1 }
+                const isSelected = selectedCalendarQuote
+                  && cell.quotes.some((quote) => quote.id === selectedCalendarQuote.id)
+
+                return (
+                  <div
+                    className={`calendar-cell ${isSelected ? 'has-popover' : ''}`}
+                    key={cell.isoDate}
+                  >
+                    <button
+                      className={`calendar-day ${cell.isCurrentMonth ? '' : 'muted'} ${
+                        cell.quotes.length ? 'has-quotes' : ''
+                      } ${isSelected ? 'is-selected' : ''}`}
+                      disabled={!cell.quotes.length}
+                      aria-label={
+                        cell.quotes.length
+                          ? `${cell.quotes.length} quotation${cell.quotes.length === 1 ? '' : 's'} expiring on ${formatDate(cell.isoDate)}`
+                          : `${formatDate(cell.isoDate)} has no quotation expiry`
+                      }
+                      type="button"
+                      onClick={() => cell.quotes[0] && openCalendarQuote(cell.quotes[0], cellWithColumn)}
+                    >
+                      <span className="calendar-date-row">
+                        <span className="calendar-date">{cell.date.getDate()}</span>
+                        {cell.quotes.length ? (
+                          <span className="calendar-count">{cell.quotes.length}</span>
+                        ) : null}
+                      </span>
+                      <span className="calendar-deadlines">
+                        {cell.quotes.slice(0, 2).map((quote) => (
+                          <span className="calendar-quote" key={quote.id}>
+                            <span className="calendar-quote-top">
+                              <span className="quote-id-chip compact">{quote.quotationNumber}</span>
+                              <span className={`calendar-status-dot status-${quote.status.toLowerCase()}`} />
+                            </span>
+                            <span className="calendar-client">{quote.clientName || 'Unnamed client'}</span>
+                            <span className="calendar-amount">
+                              {formatMoney(calculateQuote(quote).total, quote.currency)}
+                            </span>
+                          </span>
+                        ))}
+                        {cell.quotes.length > 2 ? (
+                          <span className="calendar-more">+{cell.quotes.length - 2} more</span>
+                        ) : null}
+                        {!cell.quotes.length && cell.isCurrentMonth ? (
+                          <span className="calendar-empty-note">No expiry</span>
+                        ) : null}
+                      </span>
+                    </button>
+                    {isSelected ? renderCalendarPopover() : null}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ) : null}
       </article>
     </section>
   )
