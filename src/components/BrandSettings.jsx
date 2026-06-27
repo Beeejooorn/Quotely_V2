@@ -8,11 +8,124 @@ import {
   ReceiptText,
   Trash2,
 } from 'lucide-react'
-import QuotePreview from './QuotePreview.jsx'
 
 const maxBusinessLogoSize = 1024 * 1024
 
-export default function BrandSettings({ onChange, onFeedback, quote, settings, totals }) {
+function settingValue(value, fallback = 'Not set') {
+  return String(value || '').trim() || fallback
+}
+
+function BusinessDocumentPreview({ settings }) {
+  const businessName = settingValue(settings.businessName, 'Your business name')
+  const businessEmail = settingValue(settings.businessEmail, 'Email not set')
+  const businessPhone = settingValue(settings.businessPhone, 'Phone not set')
+  const businessAddress = settingValue(settings.businessAddress, 'Address not set')
+  const registrationNumber = settingValue(settings.registrationNumber, 'Not included')
+  const paymentMethod = settingValue(settings.paymentMethod, 'Payment method not set')
+  const paymentDetails = settingValue(settings.paymentDetails, 'Payment details not set')
+  const defaultPaymentTerms = settingValue(
+    settings.defaultPaymentTerms,
+    'Default payment note not set',
+  )
+  const validityDays = Number(settings.defaultValidityDays || 14)
+  const footerContact = [settings.businessEmail, settings.businessPhone].filter(Boolean).join(' | ')
+
+  return (
+    <aside className="business-preview-panel" aria-labelledby="business-preview-heading">
+      <div className="preview-actions">
+        <div>
+          <strong id="business-preview-heading">Business document preview</strong>
+          <span>Preview how your business details appear on client-ready quotations.</span>
+        </div>
+      </div>
+
+      <article className="business-document-sample">
+        <header className="business-document-header">
+          <div className="business-document-brand">
+            <span className="business-document-logo" aria-hidden="true">
+              {settings.businessLogo ? <img alt="" src={settings.businessLogo} /> : <Building2 />}
+            </span>
+            <div>
+              <span>Quotation prepared by</span>
+              <h2>{businessName}</h2>
+              <p>{businessEmail}</p>
+              <p>{[settings.businessPhone, settings.businessAddress].filter(Boolean).join(' | ') || 'Phone and address not set'}</p>
+              {settings.registrationNumber && <p>{settings.registrationNumber}</p>}
+            </div>
+          </div>
+          <div className="business-document-mark">
+            <span>Document identity</span>
+            <strong>Ready for quotes</strong>
+          </div>
+        </header>
+
+        <div className="business-preview-note">
+          These details will appear on generated quotations.
+        </div>
+
+        <section className="business-preview-section">
+          <h3>Business identity</h3>
+          <dl className="business-preview-grid">
+            <div>
+              <dt>Business name</dt>
+              <dd>{businessName}</dd>
+            </div>
+            <div>
+              <dt>Contact email</dt>
+              <dd>{businessEmail}</dd>
+            </div>
+            <div>
+              <dt>Phone</dt>
+              <dd>{businessPhone}</dd>
+            </div>
+            <div>
+              <dt>Address</dt>
+              <dd>{businessAddress}</dd>
+            </div>
+            <div className="span-2">
+              <dt>Registration / tax number</dt>
+              <dd>{registrationNumber}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section className="business-preview-section">
+          <h3>Payment defaults</h3>
+          <div className="business-preview-stack">
+            <div>
+              <span>Preferred payment method</span>
+              <strong>{paymentMethod}</strong>
+            </div>
+            <div>
+              <span>Payment details</span>
+              <p>{paymentDetails}</p>
+            </div>
+            <div>
+              <span>Default payment note</span>
+              <p>{defaultPaymentTerms}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="business-preview-section business-preview-defaults">
+          <div>
+            <h3>Quotation defaults</h3>
+            <p>New quotations will use this expiry window by default.</p>
+          </div>
+          <strong>{validityDays || 14} days</strong>
+        </section>
+
+        <footer className="business-preview-footer">
+          <span>Footer preview</span>
+          <p>Thank you for considering {businessName} for this work.</p>
+          {footerContact && <small>{footerContact}</small>}
+        </footer>
+      </article>
+    </aside>
+  )
+}
+
+export default function BrandSettings({ onChange, onFeedback, settings }) {
   const updateSetting = (field, value) => {
     onChange({ ...settings, [field]: value })
   }
@@ -247,15 +360,7 @@ export default function BrandSettings({ onChange, onFeedback, quote, settings, t
           </div>
         </form>
 
-        <QuotePreview
-          helperText="Live reference for your quotation identity and payment details."
-          quote={quote}
-          settings={settings}
-          showActions={false}
-          totals={totals}
-          onDownload={() => {}}
-          onPrint={() => {}}
-        />
+        <BusinessDocumentPreview settings={settings} />
       </div>
     </section>
   )

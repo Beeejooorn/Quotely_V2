@@ -214,15 +214,15 @@ export function buildQuotationHtml(quote, settings) {
     <title>${escapeHtml(quote.quotationNumber)} quotation</title>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-      body { margin: 0; padding: 32px; color: #111827; font-family: "Plus Jakarta Sans", Arial, sans-serif; background: #f7f6f2; }
+      body { margin: 0; padding: 32px; color: #111827; font-family: "Plus Jakarta Sans", Arial, sans-serif; font-size: 14px; background: #f7f6f2; }
       .document { max-width: 840px; margin: 0 auto; padding: 40px; background: #fffbf3; border: 1px solid #e5e7eb; border-radius: 8px; }
-      .document::before { content: "CLIENT COPY"; display: block; width: fit-content; margin: -14px 0 18px auto; border: 1px solid #e5e7eb; border-radius: 999px; padding: 5px 9px; color: #64748b; background: #f3f4f6; font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+      .document::before { content: "CLIENT COPY"; display: block; width: fit-content; margin: -14px 0 18px auto; border: 1px solid #e5e7eb; border-radius: 999px; padding: 5px 9px; color: #64748b; background: #f3f4f6; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
       .top { display: flex; justify-content: space-between; gap: 30px; border-bottom: 1.5px solid #111827; padding-bottom: 26px; }
       h1, h2, h3, p { margin: 0; }
       h1 { font-family: "Manrope", Arial, sans-serif; font-size: 30px; line-height: 1; }
       h2 { font-family: "Manrope", Arial, sans-serif; font-size: 22px; line-height: 1.05; }
-      h3 { margin: 28px 0 10px; font-family: "Manrope", Arial, sans-serif; font-size: 13px; letter-spacing: 0; text-transform: uppercase; }
-      p, li { color: #475569; line-height: 1.55; }
+      h3 { margin: 28px 0 10px; font-family: "Manrope", Arial, sans-serif; font-size: 13.5px; letter-spacing: 0; text-transform: uppercase; }
+      p, li { color: #475569; font-size: 13.5px; line-height: 1.58; }
       .meta { position: relative; display: grid; justify-items: end; gap: 8px; min-width: 194px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; background: rgba(255, 251, 243, .96); text-align: right; box-shadow: 0 12px 26px rgba(17, 19, 26, .055), 0 0 0 3px var(--meta-glow, rgba(55, 48, 163, .06)); }
       .meta::before { content: ""; position: absolute; top: 13px; right: 13px; width: 7px; height: 7px; border-radius: 999px; background: var(--meta-dot, #3730a3); box-shadow: 0 0 0 4px var(--meta-glow, rgba(55, 48, 163, .08)); }
       .meta .label { margin-bottom: 0; padding-right: 16px; }
@@ -232,7 +232,7 @@ export function buildQuotationHtml(quote, settings) {
       .meta.status-pending { --meta-dot: #d97706; --meta-glow: rgba(217, 119, 6, .16); }
       .meta.status-approved { --meta-dot: #059669; --meta-glow: rgba(5, 150, 105, .14); }
       .meta.status-rejected { --meta-dot: #dc2626; --meta-glow: rgba(220, 38, 38, .13); }
-      .reference-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; border-bottom: 1px solid #e5e7eb; padding: 12px 0; color: #64748b; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+      .reference-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; border-bottom: 1px solid #e5e7eb; padding: 12px 0; color: #64748b; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
       .intro { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: end; border-bottom: 1px solid #e5e7eb; margin-top: 28px; padding: 0 0 24px; background: transparent; }
       .intro h2 { margin-top: 8px; font-size: 24px; }
       .hero-total { display: grid; align-content: center; min-width: 206px; border-left: 1px solid #e5e7eb; padding: 4px 0 4px 24px; background: transparent; text-align: right; }
@@ -243,36 +243,36 @@ export function buildQuotationHtml(quote, settings) {
       .logo { width: 58px; height: 58px; border-radius: 999px; object-fit: cover; }
       .logo-fallback { display: grid; width: 58px; height: 58px; place-items: center; color: #3730a3; }
       .quotely-logo { display: block; width: 100%; height: 100%; }
-      .brand-kicker { display: block; margin-bottom: 7px; color: #b45309; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
-      .label { display: block; color: #475569; font-size: 12px; font-weight: 800; }
+      .brand-kicker { display: block; margin-bottom: 7px; color: #b45309; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+      .label { display: block; color: #475569; font-size: 12.5px; font-weight: 800; }
       strong { color: #111827; }
       .section-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-top: 28px; }
       .section-head h3 { margin: 0; }
-      .pill { color: #475569; font-size: 12px; font-weight: 800; }
+      .pill { color: #475569; font-size: 12.5px; font-weight: 800; }
       .package { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; margin: 10px 0 14px; padding: 14px 0; background: transparent; }
       .package-price { font-family: "Manrope", Arial, sans-serif; font-size: 18px; white-space: nowrap; }
       ul { margin: 0; padding-left: 20px; }
       .table-wrap { overflow: hidden; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
       table { width: 100%; border-collapse: collapse; }
-      th { background: #f6f1e8; color: #64748b; font-size: 12px; text-transform: uppercase; }
+      th { background: #f6f1e8; color: #64748b; font-size: 12.5px; text-transform: uppercase; }
       th, td { border-bottom: 1px solid #e5e7eb; padding: 13px 16px; text-align: left; }
       tbody tr:last-child td { border-bottom: 0; }
       th:last-child, td:last-child { text-align: right; }
       .summary { max-width: 320px; margin-left: auto; margin-top: 14px; }
       .row { display: flex; justify-content: space-between; padding: 6px 0; color: #475569; }
       .total { border: 1px solid #efe1bd; border-radius: 8px; margin-top: 8px; padding: 14px; background: #f6f1e8; font-family: "Manrope", Arial, sans-serif; font-size: 20px; font-weight: 800; color: #b45309; }
-      .badge { display: inline-block; border-radius: 999px; padding: 6px 10px; color: #3730a3; background: #f3f4f6; font-size: 12px; font-weight: 800; }
+      .badge { display: inline-block; border-radius: 999px; padding: 6px 10px; color: #3730a3; background: #f3f4f6; font-size: 12.5px; font-weight: 800; }
       .footer { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; border-top: 1px solid #e5e7eb; margin-top: 30px; padding-top: 20px; }
       .footer .box h3 { margin-top: 0; }
       .prepared { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; border-top: 1px solid #e5e7eb; margin-top: 22px; padding-top: 18px; }
-      .prepared-name { margin-top: 7px; font-weight: 800; color: #111827; }
-      .prepared-note { margin-top: 7px; font-size: 12px; }
+      .prepared-name { margin-top: 7px; font-size: 14.5px; font-weight: 800; color: #111827; }
+      .prepared-note { margin-top: 7px; font-size: 13px; line-height: 1.58; }
       .approval-note p { margin-top: 7px; color: #475569; }
-      .closing { border-top: 1px solid #e5e7eb; margin-top: 22px; padding-top: 14px; text-align: center; font-size: 12px; }
+      .closing { border-top: 1px solid #e5e7eb; margin-top: 22px; padding-top: 14px; text-align: center; font-size: 13px; line-height: 1.5; }
       @page { margin: 14mm; }
       @media print {
         body { background: #fff; padding: 0; }
-        .document { max-width: none; border: 0; border-radius: 0; padding: 0; }
+        .document { max-width: none; border: 0; border-radius: 0; padding: 0; font-size: 14px; }
         .intro, .grid, .table-wrap, .footer, .prepared { break-inside: avoid; }
       }
       @media (max-width: 760px) {

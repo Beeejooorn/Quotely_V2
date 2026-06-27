@@ -500,8 +500,6 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
           settings={settings}
           onChange={updateSettings}
           onFeedback={showFeedback}
-          quote={draftQuote}
-          totals={draftTotals}
         />
       )
     }

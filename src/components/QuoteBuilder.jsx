@@ -1,4 +1,5 @@
-import { Plus, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { ChevronDown, Plus, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import {
   CURRENCY_OPTIONS,
   STATUS_OPTIONS,
@@ -20,6 +21,42 @@ export default function QuoteBuilder({
   totals,
 }) {
   const errorMessages = Object.values(errors)
+  const meaningfulAddOns = quote.addOns.filter(
+    (item) => item.name?.trim() || Number(item.price || 0) > 0,
+  )
+  const addOnSummary =
+    meaningfulAddOns.length > 0
+      ? `${meaningfulAddOns.length} add-on${meaningfulAddOns.length === 1 ? '' : 's'} added`
+      : 'No add-ons added'
+  const termsSummary = [
+    quote.status || 'Draft',
+    quote.validityDate ? `Valid until ${quote.validityDate}` : 'No validity date',
+    Number(quote.discount || 0) > 0
+      ? `${formatMoney(quote.discount, quote.currency)} discount`
+      : 'No discount',
+  ]
+  const taxSummary =
+    (quote.taxMode || 'none') === 'none'
+      ? 'No tax'
+      : `${quote.taxLabel || 'VAT'} ${totals.taxRate}%`
+  const [expandedSections, setExpandedSections] = useState({
+    addOns: meaningfulAddOns.length > 0,
+    terms: false,
+    total: false,
+  })
+
+  useEffect(() => {
+    if (meaningfulAddOns.length > 0) {
+      setExpandedSections((currentSections) => ({ ...currentSections, addOns: true }))
+    }
+  }, [meaningfulAddOns.length])
+
+  const toggleSection = (section) => {
+    setExpandedSections((currentSections) => ({
+      ...currentSections,
+      [section]: !currentSections[section],
+    }))
+  }
 
   const updateField = (field, value) => {
     onChange({ ...quote, [field]: value }, [field])
@@ -33,6 +70,7 @@ export default function QuoteBuilder({
   }
 
   const addAddOn = () => {
+    setExpandedSections((currentSections) => ({ ...currentSections, addOns: true }))
     onChange({ ...quote, addOns: [...quote.addOns, { name: '', price: 0 }] }, ['addOns'])
   }
 
@@ -78,7 +116,9 @@ export default function QuoteBuilder({
 
         <section className="form-section">
           <div className="form-section-heading">
-            <h3><span>1</span> Client details</h3>
+            <h3>
+              <span>1</span> Client details
+            </h3>
             <p>Who the quotation is for.</p>
           </div>
           <div className="form-grid">
@@ -143,7 +183,9 @@ export default function QuoteBuilder({
 
         <section className="form-section">
           <div className="form-section-heading">
-            <h3><span>2</span> Package and pricing</h3>
+            <h3>
+              <span>2</span> Package and pricing
+            </h3>
             <p>Package, deliverables, currency, and tax.</p>
           </div>
           <div className="form-grid">
@@ -198,7 +240,9 @@ export default function QuoteBuilder({
                 onChange={(event) => updateField('servicesIncluded', event.target.value)}
                 placeholder="One service per line"
               />
-              <small className="field-help">Add one deliverable per line so the preview stays easy to scan.</small>
+              <small className="field-help">
+                Add one deliverable per line so the preview stays easy to scan.
+              </small>
               {errors.servicesIncluded && (
                 <small className="field-error">{errors.servicesIncluded}</small>
               )}
@@ -215,7 +259,9 @@ export default function QuoteBuilder({
                   </option>
                 ))}
               </select>
-              <small className="field-help">Choose the currency shown on the client quotation.</small>
+              <small className="field-help">
+                Choose the currency shown on the client quotation.
+              </small>
             </label>
             <label className="field">
               <span>Tax/VAT</span>
@@ -229,7 +275,9 @@ export default function QuoteBuilder({
                   </option>
                 ))}
               </select>
-              <small className="field-help">Choose no tax or add tax/VAT to the final client total.</small>
+              <small className="field-help">
+                Choose no tax or add tax/VAT to the final client total.
+              </small>
             </label>
             {(quote.taxMode || 'none') !== 'none' && (
               <>
@@ -259,145 +307,204 @@ export default function QuoteBuilder({
             )}
           </div>
 
-          <div className="addons-list">
-            <div className="addons-heading">
-              <span className="field-label">Add-ons</span>
-              <small>Optional extras after the main package.</small>
-            </div>
-            {quote.addOns.map((item, index) => (
-              <div className="addon-row" key={item.id || `addon-${index}`}>
-                <input
-                  aria-label={`Add-on ${index + 1} name`}
-                  value={item.name}
-                  onChange={(event) => updateAddOn(index, 'name', event.target.value)}
-                  placeholder="Additional setup hour"
-                />
-                <input
-                  aria-label={`Add-on ${index + 1} price`}
-                  min="0"
-                  type="number"
-                  value={item.price}
-                  onChange={(event) =>
-                    updateAddOn(index, 'price', normalizeMoney(event.target.value))
-                  }
-                />
-                <button
-                  className="icon-button danger"
-                  type="button"
-                  title="Remove add-on"
-                  onClick={() => removeAddOn(index)}
-                >
-                  <Trash2 aria-hidden="true" />
+          <div className="addons-list collapsible-block">
+            <button
+              className="collapsible-heading"
+              type="button"
+              aria-expanded={expandedSections.addOns}
+              aria-controls="quote-addons-panel"
+              onClick={() => toggleSection('addOns')}
+            >
+              <span>
+                <strong>Add-ons</strong>
+                <small>{addOnSummary}</small>
+              </span>
+              <ChevronDown aria-hidden="true" />
+            </button>
+            {expandedSections.addOns && (
+              <div className="collapsible-content" id="quote-addons-panel">
+                {quote.addOns.map((item, index) => (
+                  <div className="addon-row" key={item.id || `addon-${index}`}>
+                    <input
+                      aria-label={`Add-on ${index + 1} name`}
+                      value={item.name}
+                      onChange={(event) => updateAddOn(index, 'name', event.target.value)}
+                      placeholder="Additional setup hour"
+                    />
+                    <input
+                      aria-label={`Add-on ${index + 1} price`}
+                      min="0"
+                      type="number"
+                      value={item.price}
+                      onChange={(event) =>
+                        updateAddOn(index, 'price', normalizeMoney(event.target.value))
+                      }
+                    />
+                    <button
+                      className="icon-button danger"
+                      type="button"
+                      title="Remove add-on"
+                      onClick={() => removeAddOn(index)}
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+                <button className="button secondary" type="button" onClick={addAddOn}>
+                  <Plus aria-hidden="true" />
+                  Add add-on
                 </button>
               </div>
-            ))}
-            <button className="button secondary" type="button" onClick={addAddOn}>
-              <Plus aria-hidden="true" />
-              Add add-on
-            </button>
+            )}
           </div>
         </section>
 
         <section className="form-section">
-          <div className="form-section-heading">
-            <h3><span>3</span> Terms and validity</h3>
-            <p>Payment, status, and expiry.</p>
+          <div className="form-section-heading collapsible-section-heading">
+            <div>
+              <h3>
+                <span>3</span> Terms and validity
+              </h3>
+              <p>Payment, status, and expiry.</p>
+            </div>
+            <button
+              className="section-toggle"
+              type="button"
+              aria-expanded={expandedSections.terms}
+              aria-controls="quote-terms-panel"
+              onClick={() => toggleSection('terms')}
+            >
+              {expandedSections.terms ? 'Hide details' : 'Edit details'}
+              <ChevronDown aria-hidden="true" />
+            </button>
           </div>
-          <div className="form-grid">
-            <label className="field">
-              <span>Discount</span>
-              <input
-                min="0"
-                type="number"
-                value={quote.discount}
-                onChange={(event) => updateField('discount', normalizeMoney(event.target.value))}
-              />
-            </label>
-            <label className="field">
-              <span>Status</span>
-              <select
-                value={quote.status}
-                onChange={(event) => updateField('status', event.target.value)}
-              >
-                {STATUS_OPTIONS.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Valid until</span>
-              <input
-                aria-invalid={Boolean(errors.validityDate)}
-                className={errors.validityDate ? 'is-invalid' : undefined}
-                type="date"
-                value={quote.validityDate}
-                onChange={(event) => updateField('validityDate', event.target.value)}
-              />
-              <small className="field-help">This date powers follow-ups, attention cards, and the calendar.</small>
-              {errors.validityDate && <small className="field-error">{errors.validityDate}</small>}
-            </label>
-            <label className="field span-2">
-              <span>Payment terms</span>
-              <textarea
-                aria-invalid={Boolean(errors.paymentTerms)}
-                className={errors.paymentTerms ? 'is-invalid' : undefined}
-                value={quote.paymentTerms}
-                onChange={(event) => updateField('paymentTerms', event.target.value)}
-                placeholder="Example: 50% down payment, balance due before delivery."
-              />
-              {errors.paymentTerms && <small className="field-error">{errors.paymentTerms}</small>}
-            </label>
-            <label className="field span-2">
-              <span>Notes</span>
-              <textarea
-                value={quote.notes}
-                onChange={(event) => updateField('notes', event.target.value)}
-                placeholder="Add delivery notes, exclusions, or approval reminders."
-              />
-            </label>
+          <div className="section-summary-list" aria-label="Terms summary">
+            {termsSummary.map((item) => (
+              <span key={item}>{item}</span>
+            ))}
           </div>
+          {expandedSections.terms && (
+            <div className="form-grid collapsible-content" id="quote-terms-panel">
+              <label className="field">
+                <span>Discount</span>
+                <input
+                  min="0"
+                  type="number"
+                  value={quote.discount}
+                  onChange={(event) => updateField('discount', normalizeMoney(event.target.value))}
+                />
+              </label>
+              <label className="field">
+                <span>Status</span>
+                <select
+                  value={quote.status}
+                  onChange={(event) => updateField('status', event.target.value)}
+                >
+                  {STATUS_OPTIONS.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Valid until</span>
+                <input
+                  aria-invalid={Boolean(errors.validityDate)}
+                  className={errors.validityDate ? 'is-invalid' : undefined}
+                  type="date"
+                  value={quote.validityDate}
+                  onChange={(event) => updateField('validityDate', event.target.value)}
+                />
+                <small className="field-help">Used for follow-ups and expiry dates.</small>
+                {errors.validityDate && (
+                  <small className="field-error">{errors.validityDate}</small>
+                )}
+              </label>
+              <label className="field span-2">
+                <span>Payment terms</span>
+                <textarea
+                  aria-invalid={Boolean(errors.paymentTerms)}
+                  className={errors.paymentTerms ? 'is-invalid' : undefined}
+                  value={quote.paymentTerms}
+                  onChange={(event) => updateField('paymentTerms', event.target.value)}
+                  placeholder="Example: 50% down payment, balance due before delivery."
+                />
+                {errors.paymentTerms && (
+                  <small className="field-error">{errors.paymentTerms}</small>
+                )}
+              </label>
+              <label className="field span-2">
+                <span>Notes</span>
+                <textarea
+                  value={quote.notes}
+                  onChange={(event) => updateField('notes', event.target.value)}
+                  placeholder="Add delivery notes, exclusions, or approval reminders."
+                />
+              </label>
+            </div>
+          )}
         </section>
 
         <section className="form-section preview-export-section">
-          <div className="form-section-heading">
-            <h3><span>4</span> Preview and export</h3>
-            <p>Check the calculated total before saving.</p>
+          <div className="form-section-heading collapsible-section-heading">
+            <div>
+              <h3>
+                <span>4</span> Preview and export
+              </h3>
+              <p>Check the calculated total before saving.</p>
+            </div>
+            <button
+              className="section-toggle"
+              type="button"
+              aria-expanded={expandedSections.total}
+              aria-controls="quote-total-panel"
+              onClick={() => toggleSection('total')}
+            >
+              {expandedSections.total ? 'Hide breakdown' : 'View breakdown'}
+              <ChevronDown aria-hidden="true" />
+            </button>
           </div>
-          <div className="total-strip" aria-live="polite">
-            <div className="total-strip-header">
-              <div>
-                <h3>Quotation total</h3>
-                <p>Package price, add-ons, discount, and tax.</p>
+          <div className="compact-total-summary" aria-live="polite">
+            <span>{quote.quotationNumber}</span>
+            <strong>{formatMoney(totals.total, quote.currency)}</strong>
+            <small>{taxSummary}</small>
+          </div>
+          {expandedSections.total && (
+            <div className="total-strip" id="quote-total-panel">
+              <div className="total-strip-header">
+                <div>
+                  <h3>Quotation total</h3>
+                  <p>Package price, add-ons, discount, and tax.</p>
+                </div>
+                <span>{quote.quotationNumber}</span>
               </div>
-              <span>{quote.quotationNumber}</span>
-            </div>
-            <div className="total-line">
-              <span>Base package</span>
-              <strong>{formatMoney(totals.basePrice, quote.currency)}</strong>
-            </div>
-            <div className="total-line">
-              <span>Add-ons</span>
-              <strong>{formatMoney(totals.addOnsTotal, quote.currency)}</strong>
-            </div>
-            <div className="total-line">
-              <span>Discount</span>
-              <strong>-{formatMoney(totals.discount, quote.currency)}</strong>
-            </div>
-            {(quote.taxMode || 'none') !== 'none' && (
               <div className="total-line">
-                <span>
-                  {quote.taxLabel || 'VAT'} {totals.taxRate}%
-                </span>
-                <strong>{formatMoney(totals.taxAmount, quote.currency)}</strong>
+                <span>Base package</span>
+                <strong>{formatMoney(totals.basePrice, quote.currency)}</strong>
               </div>
-            )}
-            <div className="total-line final">
-              <span>Final total</span>
-              <strong>{formatMoney(totals.total, quote.currency)}</strong>
+              <div className="total-line">
+                <span>Add-ons</span>
+                <strong>{formatMoney(totals.addOnsTotal, quote.currency)}</strong>
+              </div>
+              <div className="total-line">
+                <span>Discount</span>
+                <strong>-{formatMoney(totals.discount, quote.currency)}</strong>
+              </div>
+              {(quote.taxMode || 'none') !== 'none' && (
+                <div className="total-line">
+                  <span>
+                    {quote.taxLabel || 'VAT'} {totals.taxRate}%
+                  </span>
+                  <strong>{formatMoney(totals.taxAmount, quote.currency)}</strong>
+                </div>
+              )}
+              <div className="total-line final">
+                <span>Final total</span>
+                <strong>{formatMoney(totals.total, quote.currency)}</strong>
+              </div>
             </div>
-          </div>
+          )}
         </section>
 
         <div className="form-actions">
