@@ -5,6 +5,7 @@ import {
   CreditCard,
   FileText,
   ImagePlus,
+  Info,
   ReceiptText,
   Trash2,
 } from 'lucide-react'
@@ -55,12 +56,13 @@ function BusinessDocumentPreview({ settings }) {
           </div>
           <div className="business-document-mark">
             <span>Document identity</span>
-            <strong>Ready for quotes</strong>
+            <strong>Ready for quotations</strong>
           </div>
         </header>
 
         <div className="business-preview-note">
-          These details will appear on generated quotations.
+          <Info aria-hidden="true" />
+          <span>These details will appear on generated quotations.</span>
         </div>
 
         <section className="business-preview-section">

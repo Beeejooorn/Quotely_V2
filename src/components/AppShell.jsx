@@ -1,12 +1,14 @@
 import {
   BriefcaseBusiness,
+  Menu,
   FileText,
   FilePenLine,
   LayoutDashboard,
   PackageCheck,
-  Plus,
   UserRound,
+  X,
 } from 'lucide-react'
+import { useState } from 'react'
 import LogoMark from './LogoMark.jsx'
 
 const navItems = [
@@ -54,12 +56,17 @@ export default function AppShell({
   onNavigate,
   profileImage,
 }) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const profileName =
     account?.user_metadata?.full_name ||
     account?.user_metadata?.name ||
     account?.email ||
     'Profile'
   const uploadedProfileImage = profileImage && !profileImage.startsWith('preset:')
+  const navigateFromMobile = (section) => {
+    onNavigate(section)
+    setIsMobileMenuOpen(false)
+  }
 
   return (
     <div className="app-shell" style={{ '--brand-accent': accentColor }}>
@@ -131,22 +138,28 @@ export default function AppShell({
             </div>
           </div>
           <button
-            className="icon-button"
-            aria-label="Create quotation"
+            className="mobile-menu-button"
+            aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="mobile-navigation"
             type="button"
-            title="Create quotation"
-            onClick={() => onNavigate('create')}
+            onClick={() => setIsMobileMenuOpen((current) => !current)}
           >
-            <Plus aria-hidden="true" />
+            {isMobileMenuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+            <span>Menu</span>
           </button>
         </div>
-        <nav className="mobile-nav" aria-label="Primary navigation">
+        <nav
+          className={`mobile-nav ${isMobileMenuOpen ? 'is-open' : ''}`}
+          id="mobile-navigation"
+          aria-label="Primary navigation"
+        >
           {[...navItems, ...mobileUtilityItems].map((item) => (
             <NavButton
               activeSection={activeSection}
               item={item}
               key={item.id}
-              onNavigate={onNavigate}
+              onNavigate={navigateFromMobile}
             />
           ))}
         </nav>
