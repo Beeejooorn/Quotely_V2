@@ -28,7 +28,12 @@ export default function QuotePreview({
   const taxLabel = quote.taxLabel || 'VAT'
 
   return (
-    <section className="preview-panel" aria-labelledby="preview-heading">
+    <section
+      className="preview-panel"
+      id="quote-preview-panel"
+      role="tabpanel"
+      aria-labelledby="preview-heading"
+    >
       <div className="preview-actions">
         <div>
           <strong id="preview-heading">Quotation preview</strong>

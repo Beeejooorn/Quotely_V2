@@ -51,6 +51,12 @@ export default function QuoteBuilder({
     }
   }, [meaningfulAddOns.length])
 
+  useEffect(() => {
+    if (errors.validityDate || errors.paymentTerms) {
+      setExpandedSections((currentSections) => ({ ...currentSections, terms: true }))
+    }
+  }, [errors.paymentTerms, errors.validityDate])
+
   const toggleSection = (section) => {
     setExpandedSections((currentSections) => ({
       ...currentSections,
@@ -83,7 +89,12 @@ export default function QuoteBuilder({
   }
 
   return (
-    <section className="builder-panel" aria-labelledby="builder-heading">
+    <section
+      className="builder-panel"
+      id="quote-edit-panel"
+      role="tabpanel"
+      aria-labelledby="builder-heading"
+    >
       <div className="builder-header">
         <div>
           <h2 id="builder-heading">Quotation details</h2>

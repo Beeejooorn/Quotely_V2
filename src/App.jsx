@@ -20,6 +20,7 @@ import {
   calculateQuote,
   createBlankQuote,
   downloadQuotationHtml,
+  formatMoney,
   nextQuoteNumber,
   normalizeMoney,
   normalizeCurrency,
@@ -213,6 +214,7 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
   )
   const [profileImage, setProfileImage] = usePersistedState('profile-image', '', accountId)
   const [activeSection, setActiveSection] = useState('dashboard')
+  const [builderView, setBuilderView] = useState('edit')
   const [selectedQuoteId, setSelectedQuoteId] = useState(null)
   const [quoteErrors, setQuoteErrors] = useState({})
   const settingsFeedbackRef = useRef(null)
@@ -243,6 +245,26 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
     }
   }
 
+  const handleBuilderTabsKeyDown = (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+      return
+    }
+
+    event.preventDefault()
+
+    if (event.key === 'Home') {
+      setBuilderView('edit')
+      return
+    }
+
+    if (event.key === 'End') {
+      setBuilderView('preview')
+      return
+    }
+
+    setBuilderView((currentView) => (currentView === 'edit' ? 'preview' : 'edit'))
+  }
+
   useEffect(
     () => () => {
       if (settingsFeedbackRef.current) {
@@ -256,6 +278,7 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
     setSelectedQuoteId(null)
     setDraftQuote(createBlankQuote(nextQuoteNumber(nextQuotes), settings))
     setQuoteErrors({})
+    setBuilderView('edit')
     setActiveSection('create')
 
     if (shouldNotify) {
@@ -268,6 +291,7 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
 
     if (Object.keys(validationErrors).length) {
       setQuoteErrors(validationErrors)
+      setBuilderView('edit')
       setActiveSection('create')
       showFeedback(
         'Quotation needs a few details',
@@ -312,6 +336,7 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
       taxLabel: quote.taxLabel || 'VAT',
       taxRate: normalizeRate(quote.taxRate),
     })
+    setBuilderView('edit')
     setActiveSection('create')
   }
 
@@ -517,7 +542,7 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
                 Add the client, package, pricing, and terms before sending.
               </p>
             </div>
-            <div className="heading-actions">
+            <div className="heading-actions quote-heading-actions">
               <button
                 className="button secondary"
                 type="button"
@@ -531,7 +556,44 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
             </div>
           </div>
 
-          <div className="quote-workspace">
+          <div className="builder-view-switcher" aria-label="Quotation workspace view">
+            <div
+              className="builder-tabs"
+              role="tablist"
+              aria-label="Create quotation sections"
+              onKeyDown={handleBuilderTabsKeyDown}
+            >
+              <button
+                className={builderView === 'edit' ? 'active' : ''}
+                type="button"
+                role="tab"
+                id="quote-edit-tab"
+                aria-selected={builderView === 'edit'}
+                aria-controls="quote-edit-panel"
+                tabIndex={builderView === 'edit' ? 0 : -1}
+                onClick={() => setBuilderView('edit')}
+              >
+                Edit details
+              </button>
+              <button
+                className={builderView === 'preview' ? 'active' : ''}
+                type="button"
+                role="tab"
+                id="quote-preview-tab"
+                aria-selected={builderView === 'preview'}
+                aria-controls="quote-preview-panel"
+                tabIndex={builderView === 'preview' ? 0 : -1}
+                onClick={() => setBuilderView('preview')}
+              >
+                Preview quotation
+              </button>
+            </div>
+            <span className="builder-tabs-total">
+              Total: {formatMoney(draftTotals.total, draftQuote.currency)}
+            </span>
+          </div>
+
+          <div className={`quote-workspace is-${builderView}-view`}>
             <QuoteBuilder
               quote={draftQuote}
               totals={draftTotals}

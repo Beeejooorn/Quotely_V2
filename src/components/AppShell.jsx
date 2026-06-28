@@ -8,7 +8,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import LogoMark from './LogoMark.jsx'
 
 const navItems = [
@@ -27,10 +27,10 @@ const mobileUtilityItems = [
   ...utilityItems,
 ]
 
-function NavButton({ activeSection, item, onNavigate }) {
+function NavButton({ activeSection, item, onNavigate, tooltipScope = 'nav' }) {
   const Icon = item.icon
   const isActive = activeSection === item.id
-  const tooltipId = `nav-tooltip-${item.id}`
+  const tooltipId = `${tooltipScope}-tooltip-${item.id}`
 
   return (
     <button
@@ -57,6 +57,7 @@ export default function AppShell({
   profileImage,
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const mobileHeaderRef = useRef(null)
   const profileName =
     account?.user_metadata?.full_name ||
     account?.user_metadata?.name ||
@@ -67,6 +68,35 @@ export default function AppShell({
     onNavigate(section)
     setIsMobileMenuOpen(false)
   }
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) {
+      return undefined
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsMobileMenuOpen(false)
+        window.requestAnimationFrame(() => {
+          mobileHeaderRef.current?.querySelector('.mobile-menu-button')?.focus()
+        })
+      }
+    }
+
+    const handlePointerDown = (event) => {
+      if (!mobileHeaderRef.current?.contains(event.target)) {
+        setIsMobileMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('pointerdown', handlePointerDown)
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('pointerdown', handlePointerDown)
+    }
+  }, [isMobileMenuOpen])
 
   return (
     <div className="app-shell" style={{ '--brand-accent': accentColor }}>
@@ -126,7 +156,7 @@ export default function AppShell({
         </nav>
       </aside>
 
-      <header className="mobile-header">
+      <header className={`mobile-header ${isMobileMenuOpen ? 'is-open' : ''}`} ref={mobileHeaderRef}>
         <div className="mobile-brand-row">
           <div className="brand">
             <span className="brand-mark" aria-hidden="true">
@@ -146,13 +176,14 @@ export default function AppShell({
             onClick={() => setIsMobileMenuOpen((current) => !current)}
           >
             {isMobileMenuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
-            <span>Menu</span>
+            <span>{isMobileMenuOpen ? 'Close' : 'Menu'}</span>
           </button>
         </div>
         <nav
           className={`mobile-nav ${isMobileMenuOpen ? 'is-open' : ''}`}
           id="mobile-navigation"
           aria-label="Primary navigation"
+          aria-hidden={!isMobileMenuOpen}
         >
           {[...navItems, ...mobileUtilityItems].map((item) => (
             <NavButton
@@ -160,6 +191,7 @@ export default function AppShell({
               item={item}
               key={item.id}
               onNavigate={navigateFromMobile}
+              tooltipScope="mobile-nav"
             />
           ))}
         </nav>

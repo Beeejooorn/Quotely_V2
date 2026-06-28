@@ -272,54 +272,72 @@ export default function SavedQuotes({
             <div className="quote-cards">
               {filteredQuotes.map((quote) => {
                 const validityState = getValidityState(quote.validityDate, quote.status)
+                const quoteTotal = calculateQuote(quote).total
 
                 return (
                   <article className="quote-card" key={quote.id}>
                     <div className="quote-card-top">
-                      <div>
-                        <span className="quote-id-chip">{quote.quotationNumber}</span>
-                        <span className="quote-meta">Updated {formatDate(quote.updatedAt || quote.createdAt)}</span>
-                      </div>
+                      <span className="quote-id-chip">{quote.quotationNumber}</span>
                       <StatusBadge status={quote.status} />
                     </div>
-                    <div className="quote-card-body">
-                      <span className="quote-title">{quote.clientName || 'Unnamed client'}</span>
-                      <span className="quote-meta">{quote.projectName || 'Untitled project'}</span>
+                    <div className="quote-card-main">
+                      <div className="quote-card-identity">
+                        <span className="quote-title">{quote.clientName || 'Unnamed client'}</span>
+                        <span className="quote-meta">{quote.projectName || 'Untitled project'}</span>
+                      </div>
+                      <strong className="quote-card-total">
+                        {formatMoney(quoteTotal, quote.currency)}
+                      </strong>
+                    </div>
+                    <div className="quote-card-secondary">
+                      <span>Exp {formatDate(quote.validityDate)}</span>
                       <span className={`follow-up-pill tone-${validityState.tone}`}>
                         {validityState.label}
                       </span>
-                      <span className="quote-meta">Expires {formatDate(quote.validityDate)}</span>
-                      <strong className="quote-card-total">
-                        {formatMoney(calculateQuote(quote).total, quote.currency)}
-                      </strong>
                     </div>
-                    <label className="field quote-card-status">
-                      <span>Update status</span>
-                      <select
-                        aria-label={`Update status for ${quote.quotationNumber}`}
-                        value={quote.status}
-                        onChange={(event) => onStatusChange(quote.id, event.target.value)}
-                      >
-                        {STATUS_OPTIONS.map((status) => (
-                          <option key={status} value={status}>
-                            {status}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <div className="quote-card-actions">
-                      <button className="button secondary" type="button" onClick={() => onView(quote)}>
-                        <Eye aria-hidden="true" />
-                        Open
-                      </button>
-                      <button className="button secondary" type="button" onClick={() => onDownload(quote)}>
-                        <Download aria-hidden="true" />
-                        Download
-                      </button>
-                      <button className="button danger" type="button" onClick={() => onDelete(quote.id)}>
-                        <Trash2 aria-hidden="true" />
-                        Delete
-                      </button>
+                    <div className="quote-card-footer">
+                      <label className="quote-card-status">
+                        <span>Status</span>
+                        <select
+                          aria-label={`Update status for ${quote.quotationNumber}`}
+                          value={quote.status}
+                          onChange={(event) => onStatusChange(quote.id, event.target.value)}
+                        >
+                          {STATUS_OPTIONS.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="quote-card-actions">
+                        <button
+                          className="table-open-button"
+                          type="button"
+                          onClick={() => onView(quote)}
+                        >
+                          <Eye aria-hidden="true" />
+                          Open
+                        </button>
+                        <button
+                          className="icon-button quiet"
+                          aria-label={`Download ${quote.quotationNumber}`}
+                          type="button"
+                          title="Download quotation"
+                          onClick={() => onDownload(quote)}
+                        >
+                          <Download aria-hidden="true" />
+                        </button>
+                        <button
+                          className="icon-button danger quiet"
+                          aria-label={`Delete ${quote.quotationNumber}`}
+                          type="button"
+                          title="Delete quotation"
+                          onClick={() => onDelete(quote.id)}
+                        >
+                          <Trash2 aria-hidden="true" />
+                        </button>
+                      </div>
                     </div>
                   </article>
                 )

@@ -9,6 +9,7 @@ import {
   ReceiptText,
   Trash2,
 } from 'lucide-react'
+import { useState } from 'react'
 
 const maxBusinessLogoSize = 1024 * 1024
 
@@ -32,7 +33,12 @@ function BusinessDocumentPreview({ settings }) {
   const footerContact = [settings.businessEmail, settings.businessPhone].filter(Boolean).join(' | ')
 
   return (
-    <aside className="business-preview-panel" aria-labelledby="business-preview-heading">
+    <aside
+      className="business-preview-panel"
+      id="business-preview-panel"
+      role="tabpanel"
+      aria-labelledby="business-preview-heading"
+    >
       <div className="preview-actions">
         <div>
           <strong id="business-preview-heading">Business document preview</strong>
@@ -128,8 +134,30 @@ function BusinessDocumentPreview({ settings }) {
 }
 
 export default function BrandSettings({ onChange, onFeedback, settings }) {
+  const [businessView, setBusinessView] = useState('details')
+
   const updateSetting = (field, value) => {
     onChange({ ...settings, [field]: value })
+  }
+
+  const handleBusinessTabsKeyDown = (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+      return
+    }
+
+    event.preventDefault()
+
+    if (event.key === 'Home') {
+      setBusinessView('details')
+      return
+    }
+
+    if (event.key === 'End') {
+      setBusinessView('preview')
+      return
+    }
+
+    setBusinessView((currentView) => (currentView === 'details' ? 'preview' : 'details'))
   }
 
   const readinessItems = [
@@ -194,8 +222,43 @@ export default function BrandSettings({ onChange, onFeedback, settings }) {
         </div>
       </div>
 
-      <div className="settings-grid">
-        <form className="settings-panel">
+      <div className="business-view-switcher" aria-label="Business settings view">
+        <div
+          className="business-tabs"
+          role="tablist"
+          aria-label="Business details sections"
+          onKeyDown={handleBusinessTabsKeyDown}
+        >
+          <button
+            className={businessView === 'details' ? 'active' : ''}
+            type="button"
+            role="tab"
+            id="business-details-tab"
+            aria-selected={businessView === 'details'}
+            aria-controls="business-details-panel"
+            tabIndex={businessView === 'details' ? 0 : -1}
+            onClick={() => setBusinessView('details')}
+          >
+            Details
+          </button>
+          <button
+            className={businessView === 'preview' ? 'active' : ''}
+            type="button"
+            role="tab"
+            id="business-preview-tab"
+            aria-selected={businessView === 'preview'}
+            aria-controls="business-preview-panel"
+            tabIndex={businessView === 'preview' ? 0 : -1}
+            onClick={() => setBusinessView('preview')}
+          >
+            Preview
+          </button>
+        </div>
+        <span>Preview how this appears on quotations.</span>
+      </div>
+
+      <div className={`settings-grid is-${businessView}-view`}>
+        <form className="settings-panel" id="business-details-panel" role="tabpanel" aria-labelledby="settings-heading">
           <div className="settings-panel-top">
             <div className="settings-icon" aria-hidden="true">
               <Building2 />
@@ -311,6 +374,7 @@ export default function BrandSettings({ onChange, onFeedback, settings }) {
                 <label className="field span-2">
                   <span>Payment details</span>
                   <textarea
+                    className="business-payment-textarea"
                     value={settings.paymentDetails || ''}
                     onChange={(event) => updateSetting('paymentDetails', event.target.value)}
                     placeholder="Account name, bank, GCash number, or payment instructions"
@@ -319,6 +383,7 @@ export default function BrandSettings({ onChange, onFeedback, settings }) {
                 <label className="field span-2">
                   <span>Default payment note</span>
                   <textarea
+                    className="business-payment-textarea default-payment-note-textarea"
                     value={settings.defaultPaymentTerms || ''}
                     onChange={(event) => updateSetting('defaultPaymentTerms', event.target.value)}
                     placeholder="Example: 50% down payment, balance before turnover."
