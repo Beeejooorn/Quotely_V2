@@ -73,6 +73,16 @@ export function splitLines(value) {
     .filter(Boolean)
 }
 
+function paragraphLinesHtml(value, fallback = '') {
+  const lines = splitLines(value)
+
+  if (!lines.length && fallback) {
+    return `<p>${escapeHtml(fallback)}</p>`
+  }
+
+  return lines.map((line) => `<p>${escapeHtml(line)}</p>`).join('')
+}
+
 export function visibleAddOns(addOns = []) {
   return addOns.filter((item) => item.name.trim() || normalizeMoney(item.price) > 0)
 }
@@ -172,17 +182,17 @@ export function buildQuotationHtml(quote, settings) {
     .filter(Boolean)
     .map((line) => `<p>${escapeHtml(line)}</p>`)
     .join('')
-  const businessLogoHtml = settings.businessLogo
-    ? `<img class="logo" alt="" src="${escapeHtml(settings.businessLogo)}" />`
-    : `<span class="logo-fallback">${buildQuotelyLogoSvg()}</span>`
+  const businessLogoHtml = `<span class="logo-fallback">${buildQuotelyLogoSvg()}</span>`
   const projectDate = quote.eventDate ? formatDate(quote.eventDate) : ''
   const projectMeta = [projectDate, quote.location].filter(Boolean).join(' | ')
   const paymentTerms = quote.paymentTerms || settings.defaultPaymentTerms
-  const paymentDetails = settings.paymentDetails
-    ? `<p>${escapeHtml(settings.paymentDetails)}</p>`
-    : ''
+  const paymentDetails = paragraphLinesHtml(settings.paymentDetails)
+  const paymentTermsHtml = paragraphLinesHtml(paymentTerms, 'Payment terms will appear here.')
   const paymentMethod = settings.paymentMethod
-    ? `<p>Preferred method: ${escapeHtml(settings.paymentMethod)}</p>`
+    ? `<div><dt>Preferred payment method</dt><dd>${escapeHtml(settings.paymentMethod)}</dd></div>`
+    : ''
+  const paymentDetailsHtml = paymentDetails
+    ? `<div><dt>Payment details</dt><dd>${paymentDetails}</dd></div>`
     : ''
   const clientName = quote.clientName || 'Client name'
   const projectName = quote.projectName || 'Project name'
@@ -264,6 +274,11 @@ export function buildQuotationHtml(quote, settings) {
       .badge { display: inline-block; border-radius: 999px; padding: 6px 10px; color: #3730a3; background: #f3f4f6; font-size: 12.5px; font-weight: 800; }
       .footer { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; border-top: 1px solid #e5e7eb; margin-top: 30px; padding-top: 20px; }
       .footer .box h3 { margin-top: 0; }
+      .detail-list { display: grid; gap: 12px; margin: 0; }
+      .detail-list div { display: grid; gap: 3px; }
+      .detail-list dt { color: #475569; font-size: 12.5px; font-weight: 800; line-height: 1.3; }
+      .detail-list dd { margin: 0; }
+      .detail-list dd p + p { margin-top: 4px; }
       .prepared { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; border-top: 1px solid #e5e7eb; margin-top: 22px; padding-top: 18px; }
       .prepared-name { margin-top: 7px; font-size: 14.5px; font-weight: 800; color: #111827; }
       .prepared-note { margin-top: 7px; font-size: 13px; line-height: 1.58; }
@@ -335,7 +350,7 @@ export function buildQuotationHtml(quote, settings) {
         <div class="row total"><span>Total</span><strong>${formatMoney(totals.total, currency)}</strong></div>
       </div>
       <section class="footer">
-        <div class="box"><h3>Payment terms</h3>${paymentMethod}<p>${escapeHtml(paymentTerms || 'Payment terms will appear here.')}</p>${paymentDetails}</div>
+        <div class="box"><h3>Payment terms</h3><dl class="detail-list">${paymentMethod}<div><dt>Payment note</dt><dd>${paymentTermsHtml}</dd></div>${paymentDetailsHtml}</dl></div>
         <div class="box"><h3>Validity</h3><p>Valid until ${escapeHtml(formatDate(quote.validityDate))}</p></div>
         <div class="box"><h3>Notes</h3><p>${escapeHtml(quote.notes || 'No additional notes.')}</p></div>
       </section>

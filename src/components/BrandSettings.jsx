@@ -4,14 +4,11 @@ import {
   Clock3,
   CreditCard,
   FileText,
-  ImagePlus,
   Info,
   ReceiptText,
-  Trash2,
 } from 'lucide-react'
 import { useState } from 'react'
-
-const maxBusinessLogoSize = 1024 * 1024
+import LogoMark from './LogoMark.jsx'
 
 function settingValue(value, fallback = 'Not set') {
   return String(value || '').trim() || fallback
@@ -49,8 +46,8 @@ function BusinessDocumentPreview({ settings }) {
       <article className="business-document-sample">
         <header className="business-document-header">
           <div className="business-document-brand">
-            <span className="business-document-logo" aria-hidden="true">
-              {settings.businessLogo ? <img alt="" src={settings.businessLogo} /> : <Building2 />}
+            <span className="brand-mark business-document-logo" aria-hidden="true">
+              <LogoMark />
             </span>
             <div>
               <span>Quotation prepared by</span>
@@ -133,7 +130,7 @@ function BusinessDocumentPreview({ settings }) {
   )
 }
 
-export default function BrandSettings({ onChange, onFeedback, settings }) {
+export default function BrandSettings({ onChange, settings }) {
   const [businessView, setBusinessView] = useState('details')
 
   const updateSetting = (field, value) => {
@@ -162,11 +159,6 @@ export default function BrandSettings({ onChange, onFeedback, settings }) {
 
   const readinessItems = [
     {
-      icon: ImagePlus,
-      label: 'Logo',
-      value: settings.businessLogo ? 'Added' : 'Optional',
-    },
-    {
       icon: ReceiptText,
       label: 'Registration',
       value: settings.registrationNumber ? 'Included' : 'Not set',
@@ -182,33 +174,6 @@ export default function BrandSettings({ onChange, onFeedback, settings }) {
       value: `${settings.defaultValidityDays || 14} days`,
     },
   ]
-
-  const handleLogoUpload = (event) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-
-    if (!file) {
-      return
-    }
-
-    if (!file.type.startsWith('image/')) {
-      onFeedback?.('Logo file needed', 'Choose an image file for your business logo.', 'error')
-      return
-    }
-
-    if (file.size > maxBusinessLogoSize) {
-      onFeedback?.('Logo is too large', 'Choose a logo image under 1 MB.', 'error')
-      return
-    }
-
-    const reader = new FileReader()
-    reader.addEventListener('load', () => {
-      if (typeof reader.result === 'string') {
-        updateSetting('businessLogo', reader.result)
-      }
-    })
-    reader.readAsDataURL(file)
-  }
 
   return (
     <section className="settings-page" aria-labelledby="settings-heading">
@@ -270,38 +235,6 @@ export default function BrandSettings({ onChange, onFeedback, settings }) {
           </div>
 
           <div className="settings-form-stack">
-            <div className="business-logo-field span-2">
-              <span className="business-logo-preview" aria-hidden="true">
-                {settings.businessLogo ? (
-                  <img alt="" src={settings.businessLogo} />
-                ) : (
-                  <Building2 />
-                )}
-              </span>
-              <div>
-                <strong>Business logo</strong>
-                <p>Add a logo to make exported quotations feel more official.</p>
-              </div>
-              <div className="business-logo-actions">
-                <label className="button secondary profile-image-button">
-                  <ImagePlus aria-hidden="true" />
-                  Choose logo
-                  <input accept="image/*" type="file" onChange={handleLogoUpload} />
-                </label>
-                {settings.businessLogo && (
-                  <button
-                    className="icon-button danger"
-                    aria-label="Remove business logo"
-                    type="button"
-                    title="Remove business logo"
-                    onClick={() => updateSetting('businessLogo', '')}
-                  >
-                    <Trash2 aria-hidden="true" />
-                  </button>
-                )}
-              </div>
-            </div>
-
             <section className="settings-form-section" aria-labelledby="identity-heading">
               <div className="settings-section-heading">
                 <FileText aria-hidden="true" />

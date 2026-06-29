@@ -18,6 +18,8 @@ export default function QuotePreview({
   const projectDate = quote.eventDate ? formatDate(quote.eventDate) : ''
   const projectMeta = [projectDate, quote.location].filter(Boolean).join(' | ')
   const paymentTerms = quote.paymentTerms || settings.defaultPaymentTerms
+  const paymentTermLines = splitLines(paymentTerms)
+  const paymentDetailLines = splitLines(settings.paymentDetails)
   const clientName = quote.clientName || 'Client name'
   const projectName = quote.projectName || 'Project name'
   const businessName = settings.businessName?.trim() || 'Quotely Studio'
@@ -190,9 +192,28 @@ export default function QuotePreview({
         <footer className="document-footer">
           <div>
             <h3>Payment terms</h3>
-            {settings.paymentMethod && <p>Preferred method: {settings.paymentMethod}</p>}
-            <p>{paymentTerms || 'Payment terms will appear here.'}</p>
-            {settings.paymentDetails && <p>{settings.paymentDetails}</p>}
+            <dl className="document-detail-list">
+              {settings.paymentMethod && (
+                <div>
+                  <dt>Preferred payment method</dt>
+                  <dd>{settings.paymentMethod}</dd>
+                </div>
+              )}
+              <div>
+                <dt>Payment note</dt>
+                <dd>
+                  {paymentTermLines.length
+                    ? paymentTermLines.map((line, index) => <p key={`${line}-${index}`}>{line}</p>)
+                    : <p>Payment terms will appear here.</p>}
+                </dd>
+              </div>
+              {paymentDetailLines.length > 0 && (
+                <div>
+                  <dt>Payment details</dt>
+                  <dd>{paymentDetailLines.map((line, index) => <p key={`${line}-${index}`}>{line}</p>)}</dd>
+                </div>
+              )}
+            </dl>
           </div>
           <div>
             <h3>Validity</h3>

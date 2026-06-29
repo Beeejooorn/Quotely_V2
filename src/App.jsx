@@ -524,7 +524,6 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
         <BrandSettings
           settings={settings}
           onChange={updateSettings}
-          onFeedback={showFeedback}
         />
       )
     }
