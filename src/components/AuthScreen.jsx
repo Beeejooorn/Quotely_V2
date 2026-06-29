@@ -3,6 +3,7 @@ import { useState } from 'react'
 import LogoMark from './LogoMark.jsx'
 
 export default function AuthScreen({
+  defaultKeepSignedIn = true,
   error,
   fieldErrors = {},
   isConfigured,
@@ -10,12 +11,14 @@ export default function AuthScreen({
   onEmailAuth,
   onFieldChange,
   onSocialLogin,
+  recentlySignedOut = false,
   socialProviders = {},
 }) {
   const [mode, setMode] = useState('login')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [form, setForm] = useState({
     email: '',
+    keepSignedIn: defaultKeepSignedIn,
     name: '',
     password: '',
   })
@@ -32,6 +35,16 @@ export default function AuthScreen({
     : isConfigured && socialProviders.google === false
       ? 'Google sign-in is not available for this workspace yet.'
       : ''
+  const authTitle = isSignUp
+    ? 'Create your Quotely account'
+    : recentlySignedOut
+      ? 'Welcome back to Quotely'
+      : 'Start your Quotely workspace'
+  const authSubtitle = isSignUp
+    ? 'Create a private workspace for quotations, clients, and reusable packages.'
+    : recentlySignedOut
+      ? 'Manage quotations, clients, and follow-ups in one focused workspace.'
+      : 'Set up a focused place for quotations, clients, and follow-ups.'
 
   const updateField = (field, value) => {
     setForm((currentForm) => ({ ...currentForm, [field]: value }))
@@ -70,14 +83,8 @@ export default function AuthScreen({
         </div>
 
         <div className="auth-copy">
-          <h1 id="auth-heading">
-            {isSignUp ? 'Create your Quotely account' : 'Welcome back to Quotely'}
-          </h1>
-          <p>
-            {isSignUp
-              ? 'Create a private workspace for quotations, clients, and reusable packages.'
-              : 'Manage quotations, clients, and follow-ups in one focused workspace.'}
-          </p>
+          <h1 id="auth-heading">{authTitle}</h1>
+          <p>{authSubtitle}</p>
         </div>
 
         <div className="auth-product-row" aria-label="Quotely workspace tools">
@@ -164,6 +171,18 @@ export default function AuthScreen({
           {configMessage && <p className="auth-config-message">{configMessage}</p>}
           {message && <p className="auth-message">{message}</p>}
 
+          <label className="auth-remember">
+            <input
+              checked={form.keepSignedIn}
+              type="checkbox"
+              onChange={(event) => updateField('keepSignedIn', event.target.checked)}
+            />
+            <span>
+              <strong>Keep me signed in</strong>
+              <small>Use this on devices you trust.</small>
+            </span>
+          </label>
+
           <button
             className="button primary auth-submit"
             disabled={!isConfigured || isSubmitting}
@@ -193,7 +212,7 @@ export default function AuthScreen({
                   className="social-login-button"
                   disabled={isSubmitting || socialProviders.google !== true}
                   type="button"
-                  onClick={() => onSocialLogin('google')}
+                  onClick={() => onSocialLogin('google', form.keepSignedIn)}
                 >
                   <span className="google-mark" aria-hidden="true" />
                   Sign in with Google
@@ -204,7 +223,7 @@ export default function AuthScreen({
                   className="social-login-button"
                   disabled={isSubmitting}
                   type="button"
-                  onClick={() => onSocialLogin('x')}
+                  onClick={() => onSocialLogin('x', form.keepSignedIn)}
                 >
                   <span className="x-mark" aria-hidden="true" />
                   Sign in with X

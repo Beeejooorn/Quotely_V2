@@ -226,7 +226,7 @@ export function buildQuotationHtml(quote, settings) {
       @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
       body { margin: 0; padding: 32px; color: #111827; font-family: "Plus Jakarta Sans", Arial, sans-serif; font-size: 14px; background: #f7f6f2; }
       .document { max-width: 840px; margin: 0 auto; padding: 40px; background: #fffbf3; border: 1px solid #e5e7eb; border-radius: 8px; }
-      .document::before { content: "CLIENT COPY"; display: block; width: fit-content; margin: -14px 0 18px auto; border: 1px solid #e5e7eb; border-radius: 999px; padding: 5px 9px; color: #64748b; background: #f3f4f6; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+      .document::before { content: "CLIENT COPY"; display: block; width: fit-content; margin: -14px auto 18px 0; border: 1px solid #e5e7eb; border-radius: 999px; padding: 5px 9px; color: #64748b; background: #f3f4f6; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
       .top { display: flex; justify-content: space-between; gap: 30px; border-bottom: 1.5px solid #111827; padding-bottom: 26px; }
       h1, h2, h3, p { margin: 0; }
       h1 { font-family: "Manrope", Arial, sans-serif; font-size: 30px; line-height: 1; }
@@ -242,7 +242,8 @@ export function buildQuotationHtml(quote, settings) {
       .meta.status-pending { --meta-dot: #d97706; --meta-glow: rgba(217, 119, 6, .16); }
       .meta.status-approved { --meta-dot: #059669; --meta-glow: rgba(5, 150, 105, .14); }
       .meta.status-rejected { --meta-dot: #dc2626; --meta-glow: rgba(220, 38, 38, .13); }
-      .reference-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; border-bottom: 1px solid #e5e7eb; padding: 12px 0; color: #64748b; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+      .reference-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px 28px; border-bottom: 1px solid #e5e7eb; padding: 12px 0; color: #64748b; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+      .reference-row span:first-child { margin-right: auto; }
       .intro { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: end; border-bottom: 1px solid #e5e7eb; margin-top: 28px; padding: 0 0 24px; background: transparent; }
       .intro h2 { margin-top: 8px; font-size: 24px; }
       .hero-total { display: grid; align-content: center; min-width: 206px; border-left: 1px solid #e5e7eb; padding: 4px 0 4px 24px; background: transparent; text-align: right; }

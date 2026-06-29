@@ -728,6 +728,46 @@
   line-height: 1.45;
 }
 
+.auth-remember {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.auth-remember input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.auth-remember span {
+  display: grid;
+  gap: 2px;
+}
+
+.auth-remember strong {
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.auth-remember small {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.auth-remember:focus-within {
+  outline: 3px solid rgba(55, 48, 163, 0.12);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
 .auth-divider {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -2949,7 +2989,7 @@
   content: 'Client copy';
   position: absolute;
   top: 18px;
-  right: 18px;
+  left: 34px;
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 5px 9px;
@@ -2966,7 +3006,7 @@
   justify-content: space-between;
   gap: 30px;
   border-bottom: 1.5px solid var(--ink);
-  padding: 14px 0 26px;
+  padding: 42px 0 26px;
 }
 
 .document-brand {
@@ -3112,7 +3152,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 10px;
+  gap: 14px 28px;
   border-bottom: 1px solid var(--line);
   padding: 11px 0;
   color: var(--faint);
@@ -3120,6 +3160,10 @@
   font-weight: 850;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.document-reference-row span:first-child {
+  margin-right: auto;
 }
 
 .document-intro {
@@ -5828,7 +5872,19 @@
   }
 
   .dashboard-page .panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
     padding: 14px;
+  }
+
+  .dashboard-page .panel-header .button {
+    min-height: 38px;
+    width: fit-content;
+    max-width: 100%;
+    align-self: flex-start;
+    padding: 8px 14px;
+    white-space: nowrap;
   }
 
   .dashboard-page .activity-list,
@@ -5923,6 +5979,21 @@
 
   .addon-row {
     grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 9px;
+  }
+
+  .addons-list .collapsible-content {
+    display: grid;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .addons-list .button.secondary {
+    width: 100%;
+    min-height: 42px;
+    justify-content: center;
+    padding: 9px 12px;
   }
 
   .icon-button {

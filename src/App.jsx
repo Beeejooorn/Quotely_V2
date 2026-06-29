@@ -11,7 +11,10 @@ import ServiceLibrary from './components/ServiceLibrary.jsx'
 import LogoMark from './components/LogoMark.jsx'
 import { defaultSettings, initialQuotes } from './data/seedQuotes.js'
 import {
+  clearAuthSessionStorage,
   isSupabaseConfigured,
+  setAuthPersistence,
+  shouldPersistAuthSession,
   supabase,
   supabaseKey,
   supabaseUrl,
@@ -31,6 +34,7 @@ import './App.css'
 
 const STORAGE_VERSION = 'v2'
 const EMPTY_SERVICE_TEMPLATES = []
+const SECTION_IDS = ['dashboard', 'create', 'saved', 'services', 'settings', 'profile']
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -47,6 +51,10 @@ function normalizeStoredValue(key, value, fallback) {
 
   if (key === 'service-templates' && Array.isArray(value)) {
     return value
+  }
+
+  if (key === 'active-section') {
+    return SECTION_IDS.includes(value) ? value : fallback
   }
 
   if (
@@ -213,7 +221,11 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
     accountId,
   )
   const [profileImage, setProfileImage] = usePersistedState('profile-image', '', accountId)
-  const [activeSection, setActiveSection] = useState('dashboard')
+  const [activeSection, setActiveSection] = usePersistedState(
+    'active-section',
+    'dashboard',
+    accountId,
+  )
   const [builderView, setBuilderView] = useState('edit')
   const [selectedQuoteId, setSelectedQuoteId] = useState(null)
   const [quoteErrors, setQuoteErrors] = useState({})
@@ -758,12 +770,14 @@ function App() {
     }
   }, [])
 
-  const handleEmailAuth = async ({ email, mode, name, password }) => {
+  const handleEmailAuth = async ({ email, keepSignedIn = true, mode, name, password }) => {
     if (!supabase) {
       setAuthError('Sign-in is not ready yet.')
       showFeedback('Sign-in is not ready', 'Finish sign-in setup before launching Quotely.', 'error')
       return
     }
+
+    setAuthPersistence(keepSignedIn)
 
     const trimmedEmail = email.trim().toLowerCase()
     const trimmedName = name.trim()
@@ -829,9 +843,14 @@ function App() {
 
   const logout = async () => {
     if (supabase) {
-      await supabase.auth.signOut()
+      const { error } = await supabase.auth.signOut()
+
+      if (error) {
+        showFeedback('Session ended locally', 'Could not reach the sign-out server, so this browser was cleared.', 'error')
+      }
     }
 
+    clearAuthSessionStorage()
     setSession(null)
     setAuthError('')
     setAuthFieldErrors({})
@@ -839,12 +858,14 @@ function App() {
     showFeedback('Logged out', 'This browser no longer has access to your workspace.')
   }
 
-  const handleSocialLogin = async (provider) => {
+  const handleSocialLogin = async (provider, keepSignedIn = true) => {
     if (!supabase) {
       setAuthError('Sign-in is not ready yet.')
       showFeedback('Sign-in is not ready', 'Finish sign-in setup before launching Quotely.', 'error')
       return
     }
+
+    setAuthPersistence(keepSignedIn)
 
     const providerName = provider === 'x' ? 'X' : 'Google'
 
@@ -902,6 +923,8 @@ function App() {
           fieldErrors={authFieldErrors}
           isConfigured={isSupabaseConfigured}
           message={authMessage}
+          defaultKeepSignedIn={shouldPersistAuthSession()}
+          recentlySignedOut={authMessage.startsWith('Signed out.')}
           onFieldChange={(field) => {
             setAuthError('')
             setAuthMessage('')
