@@ -15,6 +15,24 @@ npm run dev
 On Windows PowerShell, use `npm.cmd run dev` if script execution policy blocks
 the `npm` shim.
 
+## Supabase Auth redirect setup
+
+Set these variables locally and in Vercel:
+
+```bash
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-or-anon-key
+VITE_APP_URL=https://your-vercel-domain.vercel.app
+```
+
+In Supabase, open **Authentication > URL Configuration** and set:
+
+- **Site URL**: your Vercel production URL.
+- **Redirect URLs**: your Vercel production URL, any Vercel preview URLs you use, and `http://localhost:5173` for local development.
+
+This keeps Google sign-in and email confirmation links returning to the correct
+Quotely site instead of localhost.
+
 ## MVP features
 
 - Dashboard summary metrics and quotation pipeline.
@@ -26,6 +44,7 @@ the `npm` shim.
 - Branding settings persisted locally with the quotations.
 - Responsive desktop and mobile layouts.
 
-Data is currently stored in `localStorage`, which keeps the MVP lightweight for
-demo use. A production version could add authentication, a database, PDF
-generation, email sending, analytics, and client portals.
+Quotely uses Supabase Auth for workspace access. Quotation, service, and
+business-detail records are currently stored per account in browser storage,
+which keeps the MVP lightweight for demo use. A production version could add a
+database, PDF generation, email sending, analytics, and client portals.

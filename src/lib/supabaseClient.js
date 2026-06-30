@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 export const supabaseKey =
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
+const configuredAppUrl = import.meta.env.VITE_APP_URL
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey)
 
@@ -29,6 +30,39 @@ function safeStorage(type) {
   } catch {
     return null
   }
+}
+
+function normalizeOrigin(value) {
+  if (!value) {
+    return ''
+  }
+
+  try {
+    return new URL(value).origin
+  } catch {
+    return ''
+  }
+}
+
+function isLocalOrigin(value) {
+  try {
+    const hostname = new URL(value).hostname
+
+    return ['localhost', '127.0.0.1', '::1'].includes(hostname)
+  } catch {
+    return false
+  }
+}
+
+export function getAuthRedirectUrl() {
+  const runtimeOrigin = typeof window !== 'undefined' ? normalizeOrigin(window.location.origin) : ''
+  const configuredOrigin = normalizeOrigin(configuredAppUrl)
+
+  if (runtimeOrigin && !isLocalOrigin(runtimeOrigin)) {
+    return runtimeOrigin
+  }
+
+  return configuredOrigin || runtimeOrigin || '/'
 }
 
 function getAuthPersistence() {

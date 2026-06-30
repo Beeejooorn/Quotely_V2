@@ -12,6 +12,7 @@ import LogoMark from './components/LogoMark.jsx'
 import { defaultSettings, initialQuotes } from './data/seedQuotes.js'
 import {
   clearAuthSessionStorage,
+  getAuthRedirectUrl,
   isSupabaseConfigured,
   setAuthPersistence,
   shouldPersistAuthSession,
@@ -816,6 +817,7 @@ function App() {
             password,
             options: {
               data: { full_name: trimmedName },
+              emailRedirectTo: getAuthRedirectUrl(),
             },
           })
         : await supabase.auth.signInWithPassword({
@@ -884,7 +886,7 @@ function App() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: getAuthRedirectUrl(),
       },
     })
 
