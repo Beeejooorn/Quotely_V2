@@ -377,3 +377,117 @@ export function downloadQuotationHtml(quote, settings) {
   link.remove()
   URL.revokeObjectURL(url)
 }
+
+function safeDownloadName(value) {
+  return String(value || 'quotely-quotation')
+    .trim()
+    .replace(/[^\w-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase()
+}
+
+function waitForFrameLoad(frame) {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      reject(new Error('Quotation preview took too long to prepare.'))
+    }, 8000)
+
+    frame.addEventListener(
+      'load',
+      () => {
+        window.clearTimeout(timeout)
+        resolve()
+      },
+      { once: true },
+    )
+  })
+}
+
+export async function downloadQuotationPdf(quote, settings) {
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+    import('html2canvas'),
+    import('jspdf'),
+  ])
+  const html = buildQuotationHtml(quote, settings)
+  const frame = document.createElement('iframe')
+
+  frame.setAttribute('aria-hidden', 'true')
+  frame.tabIndex = -1
+  frame.style.position = 'fixed'
+  frame.style.left = '-12000px'
+  frame.style.top = '0'
+  frame.style.width = '980px'
+  frame.style.height = '1400px'
+  frame.style.border = '0'
+
+  document.body.appendChild(frame)
+  const loaded = waitForFrameLoad(frame)
+  frame.srcdoc = html
+  await loaded
+
+  try {
+    const frameDocument = frame.contentDocument
+    const frameWindow = frame.contentWindow
+    const documentNode = frameDocument?.querySelector('.document')
+
+    if (!documentNode || !frameWindow) {
+      throw new Error('Could not prepare the quotation PDF.')
+    }
+
+    await frameDocument.fonts?.ready
+
+    const documentHeight = Math.max(
+      documentNode.scrollHeight,
+      documentNode.getBoundingClientRect().height,
+    )
+    frame.style.height = `${Math.ceil(documentHeight + 80)}px`
+
+    const canvas = await html2canvas(documentNode, {
+      backgroundColor: '#fffbf3',
+      scale: Math.min(window.devicePixelRatio || 2, 2),
+      useCORS: true,
+      windowHeight: Math.ceil(documentHeight + 80),
+      windowWidth: 980,
+    })
+
+    const pdf = new jsPDF({
+      format: 'a4',
+      orientation: 'portrait',
+      unit: 'mm',
+    })
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 10
+    const imageWidth = pageWidth - margin * 2
+    const imageHeight = (canvas.height * imageWidth) / canvas.width
+    const contentHeight = pageHeight - margin * 2
+    const imageData = canvas.toDataURL('image/png', 1)
+    let heightLeft = imageHeight
+    let pageIndex = 0
+
+    while (heightLeft > 0) {
+      if (pageIndex > 0) {
+        pdf.addPage()
+      }
+
+      pdf.addImage(
+        imageData,
+        'PNG',
+        margin,
+        margin - pageIndex * contentHeight,
+        imageWidth,
+        imageHeight,
+        undefined,
+        'FAST',
+      )
+
+      heightLeft -= contentHeight
+      pageIndex += 1
+    }
+
+    pdf.save(`${safeDownloadName(quote.quotationNumber)}-quotation.pdf`)
+  } finally {
+    frame.remove()
+  }
+}

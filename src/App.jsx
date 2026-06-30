@@ -32,7 +32,7 @@ import {
 import {
   calculateQuote,
   createBlankQuote,
-  downloadQuotationHtml,
+  downloadQuotationPdf,
   formatMoney,
   nextQuoteNumber,
   normalizeMoney,
@@ -571,9 +571,21 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
     }, 650)
   }
 
+  const downloadQuotePdf = async (quote) => {
+    try {
+      await downloadQuotationPdf(quote, settings)
+      showFeedback('Quotation downloaded', `${quote.quotationNumber} was saved as a PDF file.`)
+    } catch (error) {
+      showFeedback(
+        'Download failed',
+        error?.message || 'Could not create the quotation PDF. Try printing to PDF instead.',
+        'error',
+      )
+    }
+  }
+
   const downloadQuote = () => {
-    downloadQuotationHtml(draftQuote, settings)
-    showFeedback('Quotation downloaded', `${draftQuote.quotationNumber} was saved as an HTML file.`)
+    downloadQuotePdf(draftQuote)
   }
 
   const printQuote = () => {
@@ -686,8 +698,7 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
           onCreate={() => startNewQuote()}
           onDelete={deleteQuote}
           onDownload={(quote) => {
-            downloadQuotationHtml(quote, settings)
-            showFeedback('Quotation downloaded', `${quote.quotationNumber} was saved as an HTML file.`)
+            downloadQuotePdf(quote)
           }}
           onStatusChange={updateQuoteStatus}
           onView={viewQuote}
