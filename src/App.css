@@ -2297,7 +2297,7 @@
   background: #ffffff;
 }
 
-.elevated-empty svg {
+.elevated-empty > svg {
   width: 34px;
   height: 34px;
   border-radius: 8px;
@@ -2317,6 +2317,19 @@
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
+}
+
+.elevated-empty .button {
+  gap: 7px;
+  min-height: 42px;
+  margin-top: 4px;
+  padding: 0 18px;
+}
+
+.elevated-empty .button svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
 }
 
 .dashboard-bottom-grid {
