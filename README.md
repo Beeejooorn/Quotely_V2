@@ -33,6 +33,22 @@ In Supabase, open **Authentication > URL Configuration** and set:
 This keeps Google sign-in and email confirmation links returning to the correct
 Quotely site instead of localhost.
 
+## Supabase database setup
+
+Quotely stores account data in Supabase tables protected by Row Level Security.
+Run the SQL in `supabase/schema.sql` from the Supabase SQL Editor once for the
+project.
+
+The schema creates per-user tables for:
+
+- Quotations
+- Reusable service packages
+- Business details
+- Profile settings
+
+Each table uses `auth.uid()` policies so signed-in users can only read and
+change their own workspace records.
+
 ## MVP features
 
 - Dashboard summary metrics and quotation pipeline.
@@ -44,7 +60,7 @@ Quotely site instead of localhost.
 - Branding settings persisted locally with the quotations.
 - Responsive desktop and mobile layouts.
 
-Quotely uses Supabase Auth for workspace access. Quotation, service, and
-business-detail records are currently stored per account in browser storage,
-which keeps the MVP lightweight for demo use. A production version could add a
-database, PDF generation, email sending, analytics, and client portals.
+Quotely uses Supabase Auth for workspace access and Supabase tables for
+account-owned quotation data. Browser storage is kept as a fallback and migration
+source for existing local records. A production version could still add PDF
+generation, email sending, analytics, and client portals.

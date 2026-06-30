@@ -21,6 +21,15 @@ import {
   supabaseUrl,
 } from './lib/supabaseClient.js'
 import {
+  deleteWorkspaceQuotation,
+  deleteWorkspaceServiceTemplate,
+  loadWorkspaceData,
+  saveWorkspaceProfileImage,
+  saveWorkspaceQuotations,
+  saveWorkspaceServiceTemplates,
+  saveWorkspaceSettings,
+} from './lib/workspaceData.js'
+import {
   calculateQuote,
   createBlankQuote,
   downloadQuotationHtml,
@@ -230,7 +239,10 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
   const [builderView, setBuilderView] = useState('edit')
   const [selectedQuoteId, setSelectedQuoteId] = useState(null)
   const [quoteErrors, setQuoteErrors] = useState({})
+  const [isRemoteWorkspaceReady, setIsRemoteWorkspaceReady] = useState(false)
   const settingsFeedbackRef = useRef(null)
+  const remoteSyncFeedbackRef = useRef(false)
+  const showFeedbackRef = useRef(showFeedback)
   const [draftQuote, setDraftQuote] = useState(() =>
     createBlankQuote(nextQuoteNumber(quotes), settings),
   )
@@ -286,6 +298,158 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
     },
     [],
   )
+
+  useEffect(() => {
+    showFeedbackRef.current = showFeedback
+  }, [showFeedback])
+
+  useEffect(() => {
+    if (!accountId || !supabase) {
+      setIsRemoteWorkspaceReady(false)
+      return undefined
+    }
+
+    let isMounted = true
+
+    const hydrateWorkspace = async () => {
+      setIsRemoteWorkspaceReady(false)
+
+      const localQuotes = readStoredValue('quotes', initialQuotes, accountId)
+      const localSettings = readStoredValue('brand-settings', defaultSettings, accountId)
+      const localServices = readStoredValue(
+        'service-templates',
+        EMPTY_SERVICE_TEMPLATES,
+        accountId,
+      )
+      const localProfileImage = readStoredValue('profile-image', '', accountId)
+
+      try {
+        const remoteWorkspace = await loadWorkspaceData(accountId)
+
+        if (!isMounted) {
+          return
+        }
+
+        const shouldMigrateSettings =
+          !remoteWorkspace.settings
+          && JSON.stringify(localSettings) !== JSON.stringify(defaultSettings)
+
+        const shouldMigrateProfileImage =
+          remoteWorkspace.profileImage === null && Boolean(localProfileImage)
+
+        setQuotes(remoteWorkspace.quotes.length ? remoteWorkspace.quotes : localQuotes)
+        setServiceTemplates(
+          remoteWorkspace.serviceTemplates.length
+            ? remoteWorkspace.serviceTemplates
+            : localServices,
+        )
+        setSettings(remoteWorkspace.settings || localSettings)
+        setProfileImage(remoteWorkspace.profileImage ?? localProfileImage)
+
+        await Promise.all([
+          remoteWorkspace.quotes.length || !localQuotes.length
+            ? Promise.resolve()
+            : saveWorkspaceQuotations(accountId, localQuotes),
+          remoteWorkspace.serviceTemplates.length || !localServices.length
+            ? Promise.resolve()
+            : saveWorkspaceServiceTemplates(accountId, localServices),
+          shouldMigrateSettings
+            ? saveWorkspaceSettings(accountId, localSettings)
+            : Promise.resolve(),
+          shouldMigrateProfileImage
+            ? saveWorkspaceProfileImage(accountId, localProfileImage)
+            : Promise.resolve(),
+        ])
+
+        if (isMounted) {
+          setIsRemoteWorkspaceReady(true)
+          remoteSyncFeedbackRef.current = false
+        }
+      } catch (error) {
+        if (!isMounted) {
+          return
+        }
+
+        setQuotes(localQuotes)
+        setServiceTemplates(localServices)
+        setSettings(localSettings)
+        setProfileImage(localProfileImage)
+        setIsRemoteWorkspaceReady(false)
+        showFeedbackRef.current(
+          'Database setup needed',
+          error?.message || 'Create the Quotely Supabase tables to save data online.',
+          'error',
+        )
+      }
+    }
+
+    hydrateWorkspace()
+
+    return () => {
+      isMounted = false
+    }
+  }, [accountId, setProfileImage, setQuotes, setServiceTemplates, setSettings])
+
+  const showRemoteSyncError = (error) => {
+    if (remoteSyncFeedbackRef.current) {
+      return
+    }
+
+    remoteSyncFeedbackRef.current = true
+    showFeedbackRef.current(
+      'Could not save online',
+      error?.message || 'Your changes remain in this browser until Supabase is ready.',
+      'error',
+    )
+  }
+
+  useEffect(() => {
+    if (!accountId || !isRemoteWorkspaceReady) {
+      return undefined
+    }
+
+    const syncTimeout = window.setTimeout(() => {
+      saveWorkspaceQuotations(accountId, quotes).catch(showRemoteSyncError)
+    }, 450)
+
+    return () => window.clearTimeout(syncTimeout)
+  }, [accountId, isRemoteWorkspaceReady, quotes])
+
+  useEffect(() => {
+    if (!accountId || !isRemoteWorkspaceReady) {
+      return undefined
+    }
+
+    const syncTimeout = window.setTimeout(() => {
+      saveWorkspaceServiceTemplates(accountId, serviceTemplates).catch(showRemoteSyncError)
+    }, 450)
+
+    return () => window.clearTimeout(syncTimeout)
+  }, [accountId, isRemoteWorkspaceReady, serviceTemplates])
+
+  useEffect(() => {
+    if (!accountId || !isRemoteWorkspaceReady) {
+      return undefined
+    }
+
+    const syncTimeout = window.setTimeout(() => {
+      saveWorkspaceSettings(accountId, settings).catch(showRemoteSyncError)
+    }, 650)
+
+    return () => window.clearTimeout(syncTimeout)
+  }, [accountId, isRemoteWorkspaceReady, settings])
+
+  useEffect(() => {
+    if (!accountId || !isRemoteWorkspaceReady) {
+      return undefined
+    }
+
+    const syncTimeout = window.setTimeout(() => {
+      saveWorkspaceProfileImage(accountId, profileImage).catch(showRemoteSyncError)
+    }, 450)
+
+    return () => window.clearTimeout(syncTimeout)
+  }, [accountId, isRemoteWorkspaceReady, profileImage])
 
   const startNewQuote = (nextQuotes = quotes, shouldNotify = true) => {
     setSelectedQuoteId(null)
@@ -361,6 +525,10 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
     if (quoteId === selectedQuoteId) {
       setSelectedQuoteId(null)
       setDraftQuote(createBlankQuote(nextQuoteNumber(nextQuotes), settings))
+    }
+
+    if (isRemoteWorkspaceReady) {
+      deleteWorkspaceQuotation(accountId, quoteId).catch(showRemoteSyncError)
     }
 
     showFeedback(
@@ -457,6 +625,11 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
     setServiceTemplates((currentTemplates) =>
       currentTemplates.filter((item) => item.id !== templateId),
     )
+
+    if (isRemoteWorkspaceReady) {
+      deleteWorkspaceServiceTemplate(accountId, templateId).catch(showRemoteSyncError)
+    }
+
     showFeedback(
       'Package deleted',
       deletedTemplate?.name ? `${deletedTemplate.name} was removed.` : 'The package was removed.',
