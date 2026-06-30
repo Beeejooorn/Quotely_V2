@@ -831,6 +831,7 @@ function App() {
   const [authError, setAuthError] = useState('')
   const [authFieldErrors, setAuthFieldErrors] = useState({})
   const [authMessage, setAuthMessage] = useState('')
+  const [pendingConfirmationEmail, setPendingConfirmationEmail] = useState('')
   const [toast, setToast] = useState(null)
   const toastTimeoutRef = useRef(null)
   const [socialProviders, setSocialProviders] = useState({
@@ -888,6 +889,7 @@ function App() {
       setAuthError('')
       setAuthFieldErrors({})
       setAuthMessage('')
+      setPendingConfirmationEmail('')
 
       if (event === 'SIGNED_IN') {
         showFeedback('Signed in', 'Your quotation workspace is ready.')
@@ -982,6 +984,7 @@ function App() {
     }
 
     setAuthFieldErrors({})
+    setPendingConfirmationEmail('')
 
     const response =
       mode === 'signup'
@@ -1000,6 +1003,7 @@ function App() {
 
     if (response.error) {
       setAuthError(response.error.message)
+      setPendingConfirmationEmail('')
       showFeedback('Sign-in failed', response.error.message, 'error')
       return
     }
@@ -1008,12 +1012,49 @@ function App() {
     setAuthFieldErrors({})
     setAuthMessage(
       mode === 'signup' && !response.data.session
-        ? 'Check your email to confirm your Quotely account.'
+        ? 'Check your inbox and spam folder to confirm your Quotely account.'
         : '',
     )
     if (mode === 'signup' && !response.data.session) {
-      showFeedback('Account created', 'Check your email to confirm your Quotely account.')
+      setPendingConfirmationEmail(trimmedEmail)
+      showFeedback('Account created', 'Check your inbox and spam folder for the confirmation email.')
+    } else {
+      setPendingConfirmationEmail('')
     }
+  }
+
+  const resendConfirmationEmail = async (email) => {
+    if (!supabase) {
+      setAuthError('Sign-in is not ready yet.')
+      showFeedback('Sign-in is not ready', 'Finish sign-in setup before launching Quotely.', 'error')
+      return
+    }
+
+    const trimmedEmail = email.trim().toLowerCase()
+
+    if (!isValidEmail(trimmedEmail)) {
+      setAuthError('Use a valid email address before resending confirmation.')
+      showFeedback('Check the email address', 'Use a valid email address before resending confirmation.', 'error')
+      return
+    }
+
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: trimmedEmail,
+      options: {
+        emailRedirectTo: getAuthRedirectUrl(),
+      },
+    })
+
+    if (error) {
+      setAuthError(error.message)
+      showFeedback('Could not resend confirmation', error.message, 'error')
+      return
+    }
+
+    setAuthError('')
+    setAuthMessage('Confirmation email sent again. Check your inbox, spam, and promotions folders.')
+    showFeedback('Confirmation email sent', 'Check your inbox, spam, and promotions folders.')
   }
 
   const logout = async () => {
@@ -1029,6 +1070,7 @@ function App() {
     setSession(null)
     setAuthError('')
     setAuthFieldErrors({})
+    setPendingConfirmationEmail('')
     setAuthMessage("Signed out. Log in again when you're ready.")
     showFeedback('Logged out', 'This browser no longer has access to your workspace.')
   }
@@ -1103,6 +1145,9 @@ function App() {
           onFieldChange={(field) => {
             setAuthError('')
             setAuthMessage('')
+            if (field === 'email') {
+              setPendingConfirmationEmail('')
+            }
             setAuthFieldErrors((currentErrors) => {
               const nextErrors = { ...currentErrors }
               delete nextErrors[field]
@@ -1110,7 +1155,9 @@ function App() {
             })
           }}
           onEmailAuth={handleEmailAuth}
+          onResendConfirmation={resendConfirmationEmail}
           onSocialLogin={handleSocialLogin}
+          pendingConfirmationEmail={pendingConfirmationEmail}
           socialProviders={socialProviders}
         />
         <ToastViewport toast={toast} />

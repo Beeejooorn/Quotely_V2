@@ -10,12 +10,15 @@ export default function AuthScreen({
   message,
   onEmailAuth,
   onFieldChange,
+  onResendConfirmation,
   onSocialLogin,
+  pendingConfirmationEmail = '',
   recentlySignedOut = false,
   socialProviders = {},
 }) {
   const [mode, setMode] = useState('login')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isResending, setIsResending] = useState(false)
   const [form, setForm] = useState({
     email: '',
     keepSignedIn: defaultKeepSignedIn,
@@ -69,6 +72,19 @@ export default function AuthScreen({
       await onEmailAuth({ ...form, mode })
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const resendConfirmation = async () => {
+    if (isResending || !pendingConfirmationEmail || !onResendConfirmation) {
+      return
+    }
+
+    setIsResending(true)
+    try {
+      await onResendConfirmation(pendingConfirmationEmail)
+    } finally {
+      setIsResending(false)
     }
   }
 
@@ -170,6 +186,19 @@ export default function AuthScreen({
           {formError && <p className="auth-error">{formError}</p>}
           {configMessage && <p className="auth-config-message">{configMessage}</p>}
           {message && <p className="auth-message">{message}</p>}
+          {pendingConfirmationEmail && isSignUp && (
+            <div className="auth-resend">
+              <span>Still no email?</span>
+              <button
+                className="auth-mode-button"
+                disabled={isSubmitting || isResending}
+                type="button"
+                onClick={resendConfirmation}
+              >
+                {isResending ? 'Sending...' : 'Resend confirmation email'}
+              </button>
+            </div>
+          )}
 
           <label className="auth-remember">
             <input
