@@ -946,7 +946,14 @@ function App() {
     }
   }, [])
 
-  const handleEmailAuth = async ({ email, keepSignedIn = true, mode, name, password }) => {
+  const handleEmailAuth = async ({
+    confirmPassword = '',
+    email,
+    keepSignedIn = true,
+    mode,
+    name,
+    password,
+  }) => {
     if (!supabase) {
       setAuthError('Sign-in is not ready yet.')
       showFeedback('Sign-in is not ready', 'Finish sign-in setup before launching Quotely.', 'error')
@@ -973,6 +980,14 @@ function App() {
 
     if (mode === 'signup' && !trimmedName) {
       fieldErrors.name = 'Enter your name.'
+    }
+
+    if (mode === 'signup') {
+      if (!confirmPassword) {
+        fieldErrors.confirmPassword = 'Confirm your password.'
+      } else if (password && confirmPassword !== password) {
+        fieldErrors.confirmPassword = 'Passwords do not match.'
+      }
     }
 
     if (Object.keys(fieldErrors).length) {
@@ -1008,16 +1023,32 @@ function App() {
       return
     }
 
+    const identities = response.data.user?.identities
+    const mayAlreadyHaveAccount =
+      mode === 'signup' && !response.data.session && Array.isArray(identities) && identities.length === 0
+
+    if (mayAlreadyHaveAccount) {
+      const existingAccountMessage =
+        'This email may already have a Quotely account. Log in or use Google sign-in instead.'
+
+      setAuthError(existingAccountMessage)
+      setAuthFieldErrors({ email: existingAccountMessage })
+      setPendingConfirmationEmail('')
+      setAuthMessage('')
+      showFeedback('Account may already exist', existingAccountMessage, 'error')
+      return
+    }
+
     setAuthError('')
     setAuthFieldErrors({})
     setAuthMessage(
       mode === 'signup' && !response.data.session
-        ? 'Check your inbox and spam folder to confirm your Quotely account.'
+        ? 'Check your inbox, spam, and promotions folders to confirm your Quotely account.'
         : '',
     )
     if (mode === 'signup' && !response.data.session) {
       setPendingConfirmationEmail(trimmedEmail)
-      showFeedback('Account created', 'Check your inbox and spam folder for the confirmation email.')
+      showFeedback('Account created', 'Check your inbox, spam, and promotions folders for the confirmation email.')
     } else {
       setPendingConfirmationEmail('')
     }
@@ -1053,8 +1084,13 @@ function App() {
     }
 
     setAuthError('')
-    setAuthMessage('Confirmation email sent again. Check your inbox, spam, and promotions folders.')
-    showFeedback('Confirmation email sent', 'Check your inbox, spam, and promotions folders.')
+    setAuthMessage(
+      'Confirmation email requested. If it still does not arrive, this email may already be confirmed or registered.',
+    )
+    showFeedback(
+      'Confirmation email requested',
+      'Check your inbox, spam, and promotions folders. If nothing arrives, try logging in or use Google sign-in.',
+    )
   }
 
   const logout = async () => {

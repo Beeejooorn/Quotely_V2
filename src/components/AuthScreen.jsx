@@ -24,6 +24,7 @@ export default function AuthScreen({
     keepSignedIn: defaultKeepSignedIn,
     name: '',
     password: '',
+    confirmPassword: '',
   })
   const isSignUp = mode === 'signup'
   const configMessage = !isConfigured ? 'Sign-in is not ready yet.' : ''
@@ -59,6 +60,7 @@ export default function AuthScreen({
     onFieldChange?.('name')
     onFieldChange?.('email')
     onFieldChange?.('password')
+    onFieldChange?.('confirmPassword')
   }
 
   const submitForm = async (event) => {
@@ -183,12 +185,36 @@ export default function AuthScreen({
             )}
           </label>
 
+          {isSignUp && (
+            <label className="field">
+              <span>Confirm password</span>
+              <span className="auth-input-wrap">
+                <LockKeyhole aria-hidden="true" />
+                <input
+                  aria-describedby={fieldErrors.confirmPassword ? 'auth-confirm-password-error' : undefined}
+                  aria-invalid={Boolean(fieldErrors.confirmPassword)}
+                  className={fieldErrors.confirmPassword ? 'is-invalid' : undefined}
+                  autoComplete="new-password"
+                  type="password"
+                  value={form.confirmPassword}
+                  onChange={(event) => updateField('confirmPassword', event.target.value)}
+                  placeholder="Re-enter password"
+                />
+              </span>
+              {fieldErrors.confirmPassword && (
+                <small className="field-error" id="auth-confirm-password-error">
+                  {fieldErrors.confirmPassword}
+                </small>
+              )}
+            </label>
+          )}
+
           {formError && <p className="auth-error">{formError}</p>}
           {configMessage && <p className="auth-config-message">{configMessage}</p>}
           {message && <p className="auth-message">{message}</p>}
           {pendingConfirmationEmail && isSignUp && (
             <div className="auth-resend">
-              <span>Still no email?</span>
+              <span>No email yet?</span>
               <button
                 className="auth-mode-button"
                 disabled={isSubmitting || isResending}

@@ -33,6 +33,20 @@ In Supabase, open **Authentication > URL Configuration** and set:
 This keeps Google sign-in and email confirmation links returning to the correct
 Quotely site instead of localhost.
 
+### Email confirmation delivery
+
+If email/password signup says to confirm an account but no email arrives:
+
+- Check **Authentication > Logs** in Supabase for the signup email event.
+- Check **Authentication > Providers > Email** and confirm email signup is
+  enabled.
+- Configure **Authentication > SMTP Settings** for reliable production email
+  delivery. Supabase's built-in email service is useful for development, but a
+  custom sender is more dependable for public testing.
+- If the email was already used with Google or an existing password account,
+  Supabase may not send another signup confirmation. Log in with the existing
+  method instead.
+
 ## Supabase database setup
 
 Quotely stores account data in Supabase tables protected by Row Level Security.
