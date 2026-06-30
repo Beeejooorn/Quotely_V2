@@ -164,7 +164,6 @@ export default function AppShell({
             </span>
             <div className="brand-text">
               <strong>Quotely</strong>
-              <span>Quote workspace</span>
             </div>
           </div>
           <button
