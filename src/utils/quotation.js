@@ -400,74 +400,26 @@ export async function downloadQuotationElementPdf(documentElement, quotationNumb
   await document.fonts?.ready
 
   const bounds = documentElement.getBoundingClientRect()
-  const capturePadding = 24
-  const exportWidth = Math.ceil(bounds.width || documentElement.scrollWidth)
-  const exportHeight = Math.ceil(Math.max(bounds.height, documentElement.scrollHeight))
-  const captureStage = document.createElement('div')
-  const clonedDocument = documentElement.cloneNode(true)
-
-  captureStage.style.position = 'fixed'
-  captureStage.style.left = '-12000px'
-  captureStage.style.top = '0'
-  captureStage.style.boxSizing = 'border-box'
-  captureStage.style.width = `${exportWidth + capturePadding * 2}px`
-  captureStage.style.padding = `${capturePadding}px`
-  captureStage.style.background = '#f7f2e9'
-  captureStage.style.pointerEvents = 'none'
-  clonedDocument.removeAttribute('id')
-  clonedDocument.style.margin = '0'
-  clonedDocument.style.width = `${exportWidth}px`
-  captureStage.appendChild(clonedDocument)
-  document.body.appendChild(captureStage)
-
-  let canvas
-
-  try {
-    canvas = await html2canvas(captureStage, {
-      backgroundColor: '#f7f2e9',
-      scale: Math.min(window.devicePixelRatio || 2, 2),
-      useCORS: true,
-      windowHeight: exportHeight + capturePadding * 2,
-      windowWidth: exportWidth + capturePadding * 2,
-    })
-  } finally {
-    captureStage.remove()
-  }
+  const pagePixelWidth = Math.ceil(bounds.width || documentElement.scrollWidth)
+  const pagePixelHeight = Math.ceil(Math.max(bounds.height, documentElement.scrollHeight))
+  const canvas = await html2canvas(documentElement, {
+    backgroundColor: null,
+    scale: Math.min(window.devicePixelRatio || 2, 2),
+    useCORS: true,
+    width: pagePixelWidth,
+    height: pagePixelHeight,
+    windowHeight: Math.max(window.innerHeight || 0, pagePixelHeight),
+    windowWidth: Math.max(window.innerWidth || 0, pagePixelWidth),
+  })
 
   const pdf = new jsPDF({
-    format: 'a4',
+    format: [pagePixelWidth, pagePixelHeight],
     orientation: 'portrait',
-    unit: 'mm',
+    unit: 'px',
   })
-  const pageWidth = pdf.internal.pageSize.getWidth()
-  const pageHeight = pdf.internal.pageSize.getHeight()
-  const margin = 10
-  const imageWidth = pageWidth - margin * 2
-  const imageHeight = (canvas.height * imageWidth) / canvas.width
-  const contentHeight = pageHeight - margin * 2
   const imageData = canvas.toDataURL('image/png', 1)
-  let heightLeft = imageHeight
-  let pageIndex = 0
 
-  while (heightLeft > 0) {
-    if (pageIndex > 0) {
-      pdf.addPage()
-    }
-
-    pdf.addImage(
-      imageData,
-      'PNG',
-      margin,
-      margin - pageIndex * contentHeight,
-      imageWidth,
-      imageHeight,
-      undefined,
-      'FAST',
-    )
-
-    heightLeft -= contentHeight
-    pageIndex += 1
-  }
+  pdf.addImage(imageData, 'PNG', 0, 0, pagePixelWidth, pagePixelHeight, undefined, 'FAST')
 
   pdf.save(`${safeDownloadName(quotationNumber)}-quotation.pdf`)
 }
