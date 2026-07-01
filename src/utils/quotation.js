@@ -440,31 +440,72 @@ const PDF_COLOR_PROPERTIES = [
   'text-decoration-color',
 ]
 
-function copyPdfSafeColors(sourceElement, targetElement) {
-  const computedStyle = window.getComputedStyle(sourceElement)
+function normalizePdfCssValue(value) {
+  return normalizeCssColorFunctions(value)
+}
 
-  for (const property of PDF_COLOR_PROPERTIES) {
-    const value = normalizeCssColor(computedStyle.getPropertyValue(property))
+function copyComputedStyleForPdf(styleDeclaration, targetElement) {
+  for (const property of styleDeclaration) {
+    if (property.startsWith('--') || property === 'content') {
+      continue
+    }
+
+    const value = normalizePdfCssValue(styleDeclaration.getPropertyValue(property))
 
     if (value) {
       targetElement.style.setProperty(property, value, 'important')
     }
   }
 
-  const boxShadow = normalizeCssColorFunctions(computedStyle.getPropertyValue('box-shadow'))
-  const textShadow = normalizeCssColorFunctions(computedStyle.getPropertyValue('text-shadow'))
+  for (const property of PDF_COLOR_PROPERTIES) {
+    const value = normalizeCssColor(styleDeclaration.getPropertyValue(property))
 
-  if (boxShadow && boxShadow !== 'none') {
-    targetElement.style.setProperty('box-shadow', boxShadow, 'important')
-  }
-
-  if (textShadow && textShadow !== 'none') {
-    targetElement.style.setProperty('text-shadow', textShadow, 'important')
+    if (value) {
+      targetElement.style.setProperty(property, value, 'important')
+    }
   }
 }
 
-function sanitizePdfCloneColors(sourceRoot, clonedRoot) {
-  copyPdfSafeColors(sourceRoot, clonedRoot)
+function pseudoContentToText(content) {
+  const trimmedContent = String(content || '').trim()
+
+  if (!trimmedContent || trimmedContent === 'none' || trimmedContent === 'normal') {
+    return ''
+  }
+
+  if (
+    (trimmedContent.startsWith('"') && trimmedContent.endsWith('"')) ||
+    (trimmedContent.startsWith("'") && trimmedContent.endsWith("'"))
+  ) {
+    return trimmedContent.slice(1, -1)
+  }
+
+  return trimmedContent
+}
+
+function materializePseudoElementForPdf(sourceElement, clonedElement, pseudoName) {
+  const pseudoStyle = window.getComputedStyle(sourceElement, `::${pseudoName}`)
+  const pseudoText = pseudoContentToText(pseudoStyle.getPropertyValue('content'))
+
+  if (!pseudoText) {
+    return
+  }
+
+  const pseudoElement = clonedElement.ownerDocument.createElement('span')
+  pseudoElement.setAttribute('aria-hidden', 'true')
+  pseudoElement.textContent = pseudoText
+  copyComputedStyleForPdf(pseudoStyle, pseudoElement)
+
+  if (pseudoName === 'before') {
+    clonedElement.insertBefore(pseudoElement, clonedElement.firstChild)
+    return
+  }
+
+  clonedElement.appendChild(pseudoElement)
+}
+
+function inlineComputedStylesForPdf(sourceRoot, clonedRoot) {
+  copyComputedStyleForPdf(window.getComputedStyle(sourceRoot), clonedRoot)
 
   const sourceElements = sourceRoot.querySelectorAll('*')
   const clonedElements = clonedRoot.querySelectorAll('*')
@@ -472,10 +513,28 @@ function sanitizePdfCloneColors(sourceRoot, clonedRoot) {
   sourceElements.forEach((sourceElement, index) => {
     const clonedElement = clonedElements[index]
 
-    if (clonedElement) {
-      copyPdfSafeColors(sourceElement, clonedElement)
+    if (!clonedElement) {
+      return
     }
+
+    copyComputedStyleForPdf(window.getComputedStyle(sourceElement), clonedElement)
+    materializePseudoElementForPdf(sourceElement, clonedElement, 'before')
+    materializePseudoElementForPdf(sourceElement, clonedElement, 'after')
   })
+
+  materializePseudoElementForPdf(sourceRoot, clonedRoot, 'before')
+  materializePseudoElementForPdf(sourceRoot, clonedRoot, 'after')
+}
+
+function removeCloneStylesheetsForPdf(clonedDocument) {
+  clonedDocument.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
+    node.remove()
+  })
+
+  const fontStyle = clonedDocument.createElement('style')
+  fontStyle.textContent =
+    '@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");'
+  clonedDocument.head.appendChild(fontStyle)
 }
 
 export async function downloadQuotationElementPdf(documentElement, quotationNumber = 'quotely') {
@@ -511,7 +570,8 @@ export async function downloadQuotationElementPdf(documentElement, quotationNumb
         const clonedElement = clonedDocument.querySelector(`[data-pdf-export-root="${exportToken}"]`)
 
         if (clonedElement) {
-          sanitizePdfCloneColors(documentElement, clonedElement)
+          inlineComputedStylesForPdf(documentElement, clonedElement)
+          removeCloneStylesheetsForPdf(clonedDocument)
         }
       },
     })
