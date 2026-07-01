@@ -387,156 +387,6 @@ function safeDownloadName(value) {
     .toLowerCase()
 }
 
-function toRgbChannel(value) {
-  const trimmedValue = value.trim()
-
-  if (trimmedValue.endsWith('%')) {
-    return Math.round((Number(trimmedValue.slice(0, -1)) / 100) * 255)
-  }
-
-  const numericValue = Number(trimmedValue)
-
-  return Math.round(numericValue <= 1 ? numericValue * 255 : numericValue)
-}
-
-function normalizeCssColor(value) {
-  const trimmedValue = String(value || '').trim()
-
-  if (!trimmedValue.startsWith('color(')) {
-    return trimmedValue
-  }
-
-  const colorMatch = trimmedValue.match(/^color\(\s*[\w-]+\s+([^/)\s]+)\s+([^/)\s]+)\s+([^/)\s]+)(?:\s*\/\s*([^)]+))?\)$/i)
-
-  if (!colorMatch) {
-    return trimmedValue
-  }
-
-  const [, red, green, blue, alpha = '1'] = colorMatch
-  const normalizedAlpha = alpha.trim().endsWith('%')
-    ? Number(alpha.trim().slice(0, -1)) / 100
-    : Number(alpha.trim())
-
-  return `rgba(${toRgbChannel(red)}, ${toRgbChannel(green)}, ${toRgbChannel(blue)}, ${Number.isFinite(normalizedAlpha) ? normalizedAlpha : 1})`
-}
-
-function normalizeCssColorFunctions(value) {
-  return String(value || '').replace(
-    /color\(\s*[\w-]+\s+[^)]+\)/gi,
-    (colorValue) => normalizeCssColor(colorValue),
-  )
-}
-
-const PDF_COLOR_PROPERTIES = [
-  'background-color',
-  'border-bottom-color',
-  'border-left-color',
-  'border-right-color',
-  'border-top-color',
-  'caret-color',
-  'color',
-  'column-rule-color',
-  'outline-color',
-  'text-decoration-color',
-]
-
-function normalizePdfCssValue(value) {
-  return normalizeCssColorFunctions(value)
-}
-
-function copyComputedStyleForPdf(styleDeclaration, targetElement) {
-  for (const property of styleDeclaration) {
-    if (property.startsWith('--') || property === 'content') {
-      continue
-    }
-
-    const value = normalizePdfCssValue(styleDeclaration.getPropertyValue(property))
-
-    if (value) {
-      targetElement.style.setProperty(property, value, 'important')
-    }
-  }
-
-  for (const property of PDF_COLOR_PROPERTIES) {
-    const value = normalizeCssColor(styleDeclaration.getPropertyValue(property))
-
-    if (value) {
-      targetElement.style.setProperty(property, value, 'important')
-    }
-  }
-}
-
-function pseudoContentToText(content) {
-  const trimmedContent = String(content || '').trim()
-
-  if (!trimmedContent || trimmedContent === 'none' || trimmedContent === 'normal') {
-    return ''
-  }
-
-  if (
-    (trimmedContent.startsWith('"') && trimmedContent.endsWith('"')) ||
-    (trimmedContent.startsWith("'") && trimmedContent.endsWith("'"))
-  ) {
-    return trimmedContent.slice(1, -1)
-  }
-
-  return trimmedContent
-}
-
-function materializePseudoElementForPdf(sourceElement, clonedElement, pseudoName) {
-  const pseudoStyle = window.getComputedStyle(sourceElement, `::${pseudoName}`)
-  const pseudoText = pseudoContentToText(pseudoStyle.getPropertyValue('content'))
-
-  if (!pseudoText) {
-    return
-  }
-
-  const pseudoElement = clonedElement.ownerDocument.createElement('span')
-  pseudoElement.setAttribute('aria-hidden', 'true')
-  pseudoElement.textContent = pseudoText
-  copyComputedStyleForPdf(pseudoStyle, pseudoElement)
-
-  if (pseudoName === 'before') {
-    clonedElement.insertBefore(pseudoElement, clonedElement.firstChild)
-    return
-  }
-
-  clonedElement.appendChild(pseudoElement)
-}
-
-function inlineComputedStylesForPdf(sourceRoot, clonedRoot) {
-  copyComputedStyleForPdf(window.getComputedStyle(sourceRoot), clonedRoot)
-
-  const sourceElements = sourceRoot.querySelectorAll('*')
-  const clonedElements = clonedRoot.querySelectorAll('*')
-
-  sourceElements.forEach((sourceElement, index) => {
-    const clonedElement = clonedElements[index]
-
-    if (!clonedElement) {
-      return
-    }
-
-    copyComputedStyleForPdf(window.getComputedStyle(sourceElement), clonedElement)
-    materializePseudoElementForPdf(sourceElement, clonedElement, 'before')
-    materializePseudoElementForPdf(sourceElement, clonedElement, 'after')
-  })
-
-  materializePseudoElementForPdf(sourceRoot, clonedRoot, 'before')
-  materializePseudoElementForPdf(sourceRoot, clonedRoot, 'after')
-}
-
-function removeCloneStylesheetsForPdf(clonedDocument) {
-  clonedDocument.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
-    node.remove()
-  })
-
-  const fontStyle = clonedDocument.createElement('style')
-  fontStyle.textContent =
-    '@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");'
-  clonedDocument.head.appendChild(fontStyle)
-}
-
 export async function downloadQuotationElementPdf(documentElement, quotationNumber = 'quotely') {
   if (!documentElement) {
     throw new Error('Could not find the quotation preview to export.')
@@ -550,43 +400,74 @@ export async function downloadQuotationElementPdf(documentElement, quotationNumb
   await document.fonts?.ready
 
   const bounds = documentElement.getBoundingClientRect()
-  const pagePixelWidth = Math.ceil(bounds.width || documentElement.scrollWidth)
-  const pagePixelHeight = Math.ceil(Math.max(bounds.height, documentElement.scrollHeight))
-  const exportToken = `quote-pdf-${Date.now()}`
+  const capturePadding = 24
+  const exportWidth = Math.ceil(bounds.width || documentElement.scrollWidth)
+  const exportHeight = Math.ceil(Math.max(bounds.height, documentElement.scrollHeight))
+  const captureStage = document.createElement('div')
+  const clonedDocument = documentElement.cloneNode(true)
+
+  captureStage.style.position = 'fixed'
+  captureStage.style.left = '-12000px'
+  captureStage.style.top = '0'
+  captureStage.style.boxSizing = 'border-box'
+  captureStage.style.width = `${exportWidth + capturePadding * 2}px`
+  captureStage.style.padding = `${capturePadding}px`
+  captureStage.style.background = '#f7f2e9'
+  captureStage.style.pointerEvents = 'none'
+  clonedDocument.removeAttribute('id')
+  clonedDocument.style.margin = '0'
+  clonedDocument.style.width = `${exportWidth}px`
+  captureStage.appendChild(clonedDocument)
+  document.body.appendChild(captureStage)
+
   let canvas
 
-  documentElement.dataset.pdfExportRoot = exportToken
-
   try {
-    canvas = await html2canvas(documentElement, {
-      backgroundColor: null,
+    canvas = await html2canvas(captureStage, {
+      backgroundColor: '#f7f2e9',
       scale: Math.min(window.devicePixelRatio || 2, 2),
       useCORS: true,
-      width: pagePixelWidth,
-      height: pagePixelHeight,
-      windowHeight: Math.max(window.innerHeight || 0, pagePixelHeight),
-      windowWidth: Math.max(window.innerWidth || 0, pagePixelWidth),
-      onclone: (clonedDocument) => {
-        const clonedElement = clonedDocument.querySelector(`[data-pdf-export-root="${exportToken}"]`)
-
-        if (clonedElement) {
-          inlineComputedStylesForPdf(documentElement, clonedElement)
-          removeCloneStylesheetsForPdf(clonedDocument)
-        }
-      },
+      windowHeight: exportHeight + capturePadding * 2,
+      windowWidth: exportWidth + capturePadding * 2,
     })
   } finally {
-    delete documentElement.dataset.pdfExportRoot
+    captureStage.remove()
   }
 
   const pdf = new jsPDF({
-    format: [pagePixelWidth, pagePixelHeight],
+    format: 'a4',
     orientation: 'portrait',
-    unit: 'px',
+    unit: 'mm',
   })
+  const pageWidth = pdf.internal.pageSize.getWidth()
+  const pageHeight = pdf.internal.pageSize.getHeight()
+  const margin = 10
+  const imageWidth = pageWidth - margin * 2
+  const imageHeight = (canvas.height * imageWidth) / canvas.width
+  const contentHeight = pageHeight - margin * 2
   const imageData = canvas.toDataURL('image/png', 1)
+  let heightLeft = imageHeight
+  let pageIndex = 0
 
-  pdf.addImage(imageData, 'PNG', 0, 0, pagePixelWidth, pagePixelHeight, undefined, 'FAST')
+  while (heightLeft > 0) {
+    if (pageIndex > 0) {
+      pdf.addPage()
+    }
+
+    pdf.addImage(
+      imageData,
+      'PNG',
+      margin,
+      margin - pageIndex * contentHeight,
+      imageWidth,
+      imageHeight,
+      undefined,
+      'FAST',
+    )
+
+    heightLeft -= contentHeight
+    pageIndex += 1
+  }
 
   pdf.save(`${safeDownloadName(quotationNumber)}-quotation.pdf`)
 }
