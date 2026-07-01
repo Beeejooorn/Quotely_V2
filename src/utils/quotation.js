@@ -238,6 +238,8 @@ export function buildQuotationHtml(quote, settings) {
       body { margin: 0; padding: 32px; color: #111827; font-family: "Plus Jakarta Sans", Arial, sans-serif; font-size: 14px; background: #f7f6f2; }
       .document { max-width: 840px; margin: 0 auto; padding: 40px; background: #fffbf3; border: 1px solid #e5e7eb; border-radius: 8px; }
       .document::before { content: "CLIENT COPY"; display: block; width: fit-content; margin: -14px auto 18px 0; border: 1px solid #e5e7eb; border-radius: 999px; padding: 5px 9px; color: #64748b; background: #f3f4f6; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+      .document.pdf-export-page { box-sizing: border-box; max-width: none; margin: 0; }
+      .document.document-continuation::before { display: none; }
       .top { display: flex; justify-content: space-between; gap: 30px; border-bottom: 1.5px solid #111827; padding-bottom: 26px; }
       h1, h2, h3, p { margin: 0; }
       h1 { font-family: "Manrope", Arial, sans-serif; font-size: 30px; line-height: 1; }
@@ -333,7 +335,7 @@ export function buildQuotationHtml(quote, settings) {
           <span class="label">Quotation</span>
           <h2>${escapeHtml(quote.quotationNumber)}</h2>
           <p>Issued ${formatDate(quote.createdAt)}</p>
-          <span class="badge"><span class="badge-icon">${escapeHtml(statusIconText(quote.status))}</span>${escapeHtml(quote.status)}</span>
+          <span class="badge" data-status-icon="${escapeHtml(statusIconText(quote.status))}">${escapeHtml(quote.status)}</span>
         </div>
       </section>
       <div class="reference-row">
@@ -421,6 +423,103 @@ function waitForFrameLoad(frame) {
   })
 }
 
+function getPdfExportGroups(documentNode) {
+  const children = Array.from(documentNode.children)
+  const groups = []
+
+  for (let index = 0; index < children.length; index += 1) {
+    const child = children[index]
+    const nextChild = children[index + 1]
+    const thirdChild = children[index + 2]
+    const childText = child.textContent?.trim().toLowerCase()
+
+    if (child.classList.contains('section-head')) {
+      groups.push([child, nextChild, thirdChild].filter(Boolean))
+      index += 2
+      continue
+    }
+
+    if (child.tagName === 'H3' && childText === 'investment') {
+      groups.push([child, nextChild, thirdChild].filter(Boolean))
+      index += 2
+      continue
+    }
+
+    if (child.classList.contains('prepared') && nextChild?.classList.contains('closing')) {
+      groups.push([child, nextChild])
+      index += 1
+      continue
+    }
+
+    groups.push([child])
+  }
+
+  return groups
+}
+
+function createPdfExportPage(documentNode, pageIndex, pageWidth) {
+  const page = documentNode.cloneNode(false)
+
+  page.classList.add('pdf-export-page')
+  page.style.width = `${Math.ceil(pageWidth)}px`
+  page.style.maxWidth = 'none'
+  page.style.margin = '0'
+  page.style.boxSizing = 'border-box'
+
+  if (pageIndex > 0) {
+    page.classList.add('document-continuation')
+  }
+
+  return page
+}
+
+function appendPdfGroup(page, group) {
+  const clones = group.map((element) => element.cloneNode(true))
+
+  clones.forEach((clone) => page.appendChild(clone))
+
+  return clones
+}
+
+function removePdfGroup(clones) {
+  clones.forEach((clone) => clone.remove())
+}
+
+function paginatePdfDocument(documentNode, pageHeight) {
+  const ownerDocument = documentNode.ownerDocument
+  const documentWidth = documentNode.getBoundingClientRect().width
+  const host = ownerDocument.createElement('div')
+  const pages = []
+  const groups = getPdfExportGroups(documentNode)
+  let currentPage = createPdfExportPage(documentNode, 0, documentWidth)
+
+  host.setAttribute('aria-hidden', 'true')
+  host.style.position = 'absolute'
+  host.style.left = '0'
+  host.style.top = '0'
+  host.style.width = `${Math.ceil(documentWidth)}px`
+
+  documentNode.after(host)
+  host.appendChild(currentPage)
+  pages.push(currentPage)
+
+  groups.forEach((group) => {
+    let clones = appendPdfGroup(currentPage, group)
+    const hasPreviousContent = currentPage.children.length > clones.length
+    const pageIsTooTall = currentPage.scrollHeight > pageHeight
+
+    if (pageIsTooTall && hasPreviousContent) {
+      removePdfGroup(clones)
+      currentPage = createPdfExportPage(documentNode, pages.length, documentWidth)
+      host.appendChild(currentPage)
+      pages.push(currentPage)
+      clones = appendPdfGroup(currentPage, group)
+    }
+  })
+
+  return { host, pages }
+}
+
 export async function downloadQuotationPdf(quote, settings) {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
     import('html2canvas'),
@@ -454,20 +553,6 @@ export async function downloadQuotationPdf(quote, settings) {
 
     await frameDocument.fonts?.ready
 
-    const documentHeight = Math.max(
-      documentNode.scrollHeight,
-      documentNode.getBoundingClientRect().height,
-    )
-    frame.style.height = `${Math.ceil(documentHeight + 80)}px`
-
-    const canvas = await html2canvas(documentNode, {
-      backgroundColor: '#fffbf3',
-      scale: Math.min(window.devicePixelRatio || 2, 2),
-      useCORS: true,
-      windowHeight: Math.ceil(documentHeight + 80),
-      windowWidth: 980,
-    })
-
     const pdf = new jsPDF({
       format: 'a4',
       orientation: 'portrait',
@@ -477,30 +562,42 @@ export async function downloadQuotationPdf(quote, settings) {
     const pageHeight = pdf.internal.pageSize.getHeight()
     const margin = 10
     const imageWidth = pageWidth - margin * 2
-    const imageHeight = (canvas.height * imageWidth) / canvas.width
     const contentHeight = pageHeight - margin * 2
-    const imageData = canvas.toDataURL('image/png', 1)
-    let heightLeft = imageHeight
-    let pageIndex = 0
+    const documentWidth = documentNode.getBoundingClientRect().width
+    const pageHeightPixels = Math.floor((contentHeight * documentWidth) / imageWidth)
+    const { pages } = paginatePdfDocument(documentNode, pageHeightPixels)
 
-    while (heightLeft > 0) {
-      if (pageIndex > 0) {
+    frame.style.height = `${Math.ceil(
+      pages.reduce((totalHeight, page) => totalHeight + page.scrollHeight, 0) + 120,
+    )}px`
+
+    for (const [index, page] of pages.entries()) {
+      const pageHeight = Math.max(page.scrollHeight, page.getBoundingClientRect().height)
+      const canvas = await html2canvas(page, {
+        backgroundColor: '#fffbf3',
+        scale: Math.min(window.devicePixelRatio || 2, 2),
+        useCORS: true,
+        windowHeight: Math.ceil(pageHeight + 24),
+        windowWidth: Math.ceil(documentWidth),
+      })
+
+      if (index > 0) {
         pdf.addPage()
       }
+
+      const imageHeight = (canvas.height * imageWidth) / canvas.width
+      const imageData = canvas.toDataURL('image/png', 1)
 
       pdf.addImage(
         imageData,
         'PNG',
         margin,
-        margin - pageIndex * contentHeight,
+        margin,
         imageWidth,
         imageHeight,
         undefined,
         'FAST',
       )
-
-      heightLeft -= contentHeight
-      pageIndex += 1
     }
 
     pdf.save(`${safeDownloadName(quote.quotationNumber)}-quotation.pdf`)
