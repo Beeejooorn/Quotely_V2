@@ -387,6 +387,97 @@ function safeDownloadName(value) {
     .toLowerCase()
 }
 
+function toRgbChannel(value) {
+  const trimmedValue = value.trim()
+
+  if (trimmedValue.endsWith('%')) {
+    return Math.round((Number(trimmedValue.slice(0, -1)) / 100) * 255)
+  }
+
+  const numericValue = Number(trimmedValue)
+
+  return Math.round(numericValue <= 1 ? numericValue * 255 : numericValue)
+}
+
+function normalizeCssColor(value) {
+  const trimmedValue = String(value || '').trim()
+
+  if (!trimmedValue.startsWith('color(')) {
+    return trimmedValue
+  }
+
+  const colorMatch = trimmedValue.match(/^color\(\s*[\w-]+\s+([^/)\s]+)\s+([^/)\s]+)\s+([^/)\s]+)(?:\s*\/\s*([^)]+))?\)$/i)
+
+  if (!colorMatch) {
+    return trimmedValue
+  }
+
+  const [, red, green, blue, alpha = '1'] = colorMatch
+  const normalizedAlpha = alpha.trim().endsWith('%')
+    ? Number(alpha.trim().slice(0, -1)) / 100
+    : Number(alpha.trim())
+
+  return `rgba(${toRgbChannel(red)}, ${toRgbChannel(green)}, ${toRgbChannel(blue)}, ${Number.isFinite(normalizedAlpha) ? normalizedAlpha : 1})`
+}
+
+function normalizeCssColorFunctions(value) {
+  return String(value || '').replace(
+    /color\(\s*[\w-]+\s+[^)]+\)/gi,
+    (colorValue) => normalizeCssColor(colorValue),
+  )
+}
+
+const PDF_COLOR_PROPERTIES = [
+  'background-color',
+  'border-bottom-color',
+  'border-left-color',
+  'border-right-color',
+  'border-top-color',
+  'caret-color',
+  'color',
+  'column-rule-color',
+  'outline-color',
+  'text-decoration-color',
+]
+
+function copyPdfSafeColors(sourceElement, targetElement) {
+  const computedStyle = window.getComputedStyle(sourceElement)
+
+  for (const property of PDF_COLOR_PROPERTIES) {
+    const value = normalizeCssColor(computedStyle.getPropertyValue(property))
+
+    if (value) {
+      targetElement.style.setProperty(property, value, 'important')
+    }
+  }
+
+  const boxShadow = normalizeCssColorFunctions(computedStyle.getPropertyValue('box-shadow'))
+  const textShadow = normalizeCssColorFunctions(computedStyle.getPropertyValue('text-shadow'))
+
+  if (boxShadow && boxShadow !== 'none') {
+    targetElement.style.setProperty('box-shadow', boxShadow, 'important')
+  }
+
+  if (textShadow && textShadow !== 'none') {
+    targetElement.style.setProperty('text-shadow', textShadow, 'important')
+  }
+}
+
+function sanitizePdfCloneColors(sourceRoot, clonedRoot) {
+  copyPdfSafeColors(sourceRoot, clonedRoot)
+
+  const sourceElements = sourceRoot.querySelectorAll('*')
+  const clonedElements = clonedRoot.querySelectorAll('*')
+
+  sourceElements.forEach((sourceElement, index) => {
+    const clonedElement = clonedElements[index]
+
+    if (clonedElement) {
+      copyPdfSafeColors(sourceElement, clonedElement)
+    }
+  })
+}
+
 export async function downloadQuotationElementPdf(documentElement, quotationNumber = 'quotely') {
   if (!documentElement) {
     throw new Error('Could not find the quotation preview to export.')
@@ -402,15 +493,31 @@ export async function downloadQuotationElementPdf(documentElement, quotationNumb
   const bounds = documentElement.getBoundingClientRect()
   const pagePixelWidth = Math.ceil(bounds.width || documentElement.scrollWidth)
   const pagePixelHeight = Math.ceil(Math.max(bounds.height, documentElement.scrollHeight))
-  const canvas = await html2canvas(documentElement, {
-    backgroundColor: null,
-    scale: Math.min(window.devicePixelRatio || 2, 2),
-    useCORS: true,
-    width: pagePixelWidth,
-    height: pagePixelHeight,
-    windowHeight: Math.max(window.innerHeight || 0, pagePixelHeight),
-    windowWidth: Math.max(window.innerWidth || 0, pagePixelWidth),
-  })
+  const exportToken = `quote-pdf-${Date.now()}`
+  let canvas
+
+  documentElement.dataset.pdfExportRoot = exportToken
+
+  try {
+    canvas = await html2canvas(documentElement, {
+      backgroundColor: null,
+      scale: Math.min(window.devicePixelRatio || 2, 2),
+      useCORS: true,
+      width: pagePixelWidth,
+      height: pagePixelHeight,
+      windowHeight: Math.max(window.innerHeight || 0, pagePixelHeight),
+      windowWidth: Math.max(window.innerWidth || 0, pagePixelWidth),
+      onclone: (clonedDocument) => {
+        const clonedElement = clonedDocument.querySelector(`[data-pdf-export-root="${exportToken}"]`)
+
+        if (clonedElement) {
+          sanitizePdfCloneColors(documentElement, clonedElement)
+        }
+      },
+    })
+  } finally {
+    delete documentElement.dataset.pdfExportRoot
+  }
 
   const pdf = new jsPDF({
     format: [pagePixelWidth, pagePixelHeight],
