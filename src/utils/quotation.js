@@ -387,6 +387,91 @@ function safeDownloadName(value) {
     .toLowerCase()
 }
 
+export async function downloadQuotationElementPdf(documentElement, quotationNumber = 'quotely') {
+  if (!documentElement) {
+    throw new Error('Could not find the quotation preview to export.')
+  }
+
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+    import('html2canvas'),
+    import('jspdf'),
+  ])
+
+  await document.fonts?.ready
+
+  const bounds = documentElement.getBoundingClientRect()
+  const capturePadding = 24
+  const exportWidth = Math.ceil(bounds.width || documentElement.scrollWidth)
+  const exportHeight = Math.ceil(Math.max(bounds.height, documentElement.scrollHeight))
+  const captureStage = document.createElement('div')
+  const clonedDocument = documentElement.cloneNode(true)
+
+  captureStage.style.position = 'fixed'
+  captureStage.style.left = '-12000px'
+  captureStage.style.top = '0'
+  captureStage.style.boxSizing = 'border-box'
+  captureStage.style.width = `${exportWidth + capturePadding * 2}px`
+  captureStage.style.padding = `${capturePadding}px`
+  captureStage.style.background = '#f7f2e9'
+  captureStage.style.pointerEvents = 'none'
+  clonedDocument.removeAttribute('id')
+  clonedDocument.style.margin = '0'
+  clonedDocument.style.width = `${exportWidth}px`
+  captureStage.appendChild(clonedDocument)
+  document.body.appendChild(captureStage)
+
+  let canvas
+
+  try {
+    canvas = await html2canvas(captureStage, {
+      backgroundColor: '#f7f2e9',
+      scale: Math.min(window.devicePixelRatio || 2, 2),
+      useCORS: true,
+      windowHeight: exportHeight + capturePadding * 2,
+      windowWidth: exportWidth + capturePadding * 2,
+    })
+  } finally {
+    captureStage.remove()
+  }
+
+  const pdf = new jsPDF({
+    format: 'a4',
+    orientation: 'portrait',
+    unit: 'mm',
+  })
+  const pageWidth = pdf.internal.pageSize.getWidth()
+  const pageHeight = pdf.internal.pageSize.getHeight()
+  const margin = 10
+  const imageWidth = pageWidth - margin * 2
+  const imageHeight = (canvas.height * imageWidth) / canvas.width
+  const contentHeight = pageHeight - margin * 2
+  const imageData = canvas.toDataURL('image/png', 1)
+  let heightLeft = imageHeight
+  let pageIndex = 0
+
+  while (heightLeft > 0) {
+    if (pageIndex > 0) {
+      pdf.addPage()
+    }
+
+    pdf.addImage(
+      imageData,
+      'PNG',
+      margin,
+      margin - pageIndex * contentHeight,
+      imageWidth,
+      imageHeight,
+      undefined,
+      'FAST',
+    )
+
+    heightLeft -= contentHeight
+    pageIndex += 1
+  }
+
+  pdf.save(`${safeDownloadName(quotationNumber)}-quotation.pdf`)
+}
+
 function waitForFrameLoad(frame) {
   return new Promise((resolve, reject) => {
     const timeout = window.setTimeout(() => {
@@ -405,10 +490,6 @@ function waitForFrameLoad(frame) {
 }
 
 export async function downloadQuotationPdf(quote, settings) {
-  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-    import('html2canvas'),
-    import('jspdf'),
-  ])
   const html = buildQuotationHtml(quote, settings)
   const frame = document.createElement('iframe')
 
@@ -443,50 +524,7 @@ export async function downloadQuotationPdf(quote, settings) {
     )
     frame.style.height = `${Math.ceil(documentHeight + 80)}px`
 
-    const canvas = await html2canvas(documentNode, {
-      backgroundColor: '#fffbf3',
-      scale: Math.min(window.devicePixelRatio || 2, 2),
-      useCORS: true,
-      windowHeight: Math.ceil(documentHeight + 80),
-      windowWidth: 980,
-    })
-
-    const pdf = new jsPDF({
-      format: 'a4',
-      orientation: 'portrait',
-      unit: 'mm',
-    })
-    const pageWidth = pdf.internal.pageSize.getWidth()
-    const pageHeight = pdf.internal.pageSize.getHeight()
-    const margin = 10
-    const imageWidth = pageWidth - margin * 2
-    const imageHeight = (canvas.height * imageWidth) / canvas.width
-    const contentHeight = pageHeight - margin * 2
-    const imageData = canvas.toDataURL('image/png', 1)
-    let heightLeft = imageHeight
-    let pageIndex = 0
-
-    while (heightLeft > 0) {
-      if (pageIndex > 0) {
-        pdf.addPage()
-      }
-
-      pdf.addImage(
-        imageData,
-        'PNG',
-        margin,
-        margin - pageIndex * contentHeight,
-        imageWidth,
-        imageHeight,
-        undefined,
-        'FAST',
-      )
-
-      heightLeft -= contentHeight
-      pageIndex += 1
-    }
-
-    pdf.save(`${safeDownloadName(quote.quotationNumber)}-quotation.pdf`)
+    await downloadQuotationElementPdf(documentNode, quote.quotationNumber)
   } finally {
     frame.remove()
   }

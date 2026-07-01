@@ -3021,6 +3021,25 @@
     0 12px 24px rgba(17, 19, 26, 0.045);
 }
 
+.pdf-export-host {
+  position: fixed;
+  top: 0;
+  left: -12000px;
+  z-index: -1;
+  width: 760px;
+  pointer-events: none;
+}
+
+.pdf-export-host .preview-panel {
+  position: static;
+  overflow: visible;
+  width: 100%;
+}
+
+.pdf-export-host .preview-actions {
+  display: none;
+}
+
 .quotation-document::before {
   content: 'Client copy';
   position: absolute;

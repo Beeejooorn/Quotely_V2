@@ -4,9 +4,12 @@ import LogoMark from './LogoMark.jsx'
 import { formatDate, formatMoney, splitLines, statusClass, visibleAddOns } from '../utils/quotation.js'
 
 export default function QuotePreview({
+  documentId = 'print-document',
   helperText = 'Review the client-facing quote before printing or downloading.',
+  headingId = 'preview-heading',
   onDownload,
   onPrint,
+  panelId = 'quote-preview-panel',
   quote,
   settings,
   showActions = true,
@@ -32,13 +35,13 @@ export default function QuotePreview({
   return (
     <section
       className="preview-panel"
-      id="quote-preview-panel"
+      id={panelId}
       role="tabpanel"
-      aria-labelledby="preview-heading"
+      aria-labelledby={headingId}
     >
       <div className="preview-actions">
         <div>
-          <strong id="preview-heading">Quotation preview</strong>
+          <strong id={headingId}>Quotation preview</strong>
           <span>{helperText}</span>
         </div>
         {showActions && (
@@ -55,7 +58,7 @@ export default function QuotePreview({
         )}
       </div>
 
-      <article className="quotation-document" id="print-document">
+      <article className="quotation-document" id={documentId}>
         <header className="document-header">
           <div className="document-brand">
             {settings.businessLogo ? (
