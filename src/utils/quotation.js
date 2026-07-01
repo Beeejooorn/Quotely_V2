@@ -167,6 +167,17 @@ function buildQuotelyLogoSvg() {
   </svg>`
 }
 
+function statusIconText(status) {
+  const normalizedStatus = String(status || 'Draft').toLowerCase()
+
+  if (normalizedStatus === 'approved') return '✓'
+  if (normalizedStatus === 'pending') return '◷'
+  if (normalizedStatus === 'rejected') return '×'
+  if (normalizedStatus === 'sent') return '↗'
+
+  return '□'
+}
+
 export function buildQuotationHtml(quote, settings) {
   const totals = calculateQuote(quote)
   const services = splitLines(quote.servicesIncluded)
@@ -233,15 +244,16 @@ export function buildQuotationHtml(quote, settings) {
       h2 { font-family: "Manrope", Arial, sans-serif; font-size: 22px; line-height: 1.05; }
       h3 { margin: 28px 0 10px; font-family: "Manrope", Arial, sans-serif; font-size: 13.5px; letter-spacing: 0; text-transform: uppercase; }
       p, li { color: #475569; font-size: 13.5px; line-height: 1.58; }
-      .meta { position: relative; display: grid; justify-items: end; gap: 8px; min-width: 194px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; background: rgba(255, 251, 243, .96); text-align: right; box-shadow: 0 12px 26px rgba(17, 19, 26, .055), 0 0 0 3px var(--meta-glow, rgba(55, 48, 163, .06)); }
-      .meta::before { content: ""; position: absolute; top: 13px; right: 13px; width: 7px; height: 7px; border-radius: 999px; background: var(--meta-dot, #3730a3); box-shadow: 0 0 0 4px var(--meta-glow, rgba(55, 48, 163, .08)); }
-      .meta .label { margin-bottom: 0; padding-right: 16px; }
-      .meta p { margin-top: 0; font-size: 13px; }
-      .meta.status-draft { --meta-dot: #8a8f9e; --meta-glow: rgba(138, 143, 158, .12); }
-      .meta.status-sent { --meta-dot: #64748b; --meta-glow: rgba(100, 116, 139, .12); }
-      .meta.status-pending { --meta-dot: #d97706; --meta-glow: rgba(217, 119, 6, .16); }
-      .meta.status-approved { --meta-dot: #059669; --meta-glow: rgba(5, 150, 105, .14); }
-      .meta.status-rejected { --meta-dot: #dc2626; --meta-glow: rgba(220, 38, 38, .13); }
+      .meta { position: relative; display: grid; justify-items: center; align-content: center; gap: 10px; min-width: 212px; border: 2px solid var(--meta-border, #e5e7eb); border-radius: 12px; padding: 22px 18px; background: rgba(255, 251, 243, .96); text-align: center; box-shadow: 0 14px 28px rgba(17, 19, 26, .055), 0 0 0 4px var(--meta-glow, rgba(55, 48, 163, .06)); }
+      .meta::before { content: ""; position: absolute; top: 14px; right: 14px; width: 8px; height: 8px; border-radius: 999px; background: var(--meta-dot, #3730a3); box-shadow: 0 0 0 5px var(--meta-glow, rgba(55, 48, 163, .08)); }
+      .meta .label { margin-bottom: -2px; padding-right: 0; color: #475569; font-size: 13px; font-weight: 850; }
+      .meta h2 { font-size: 28px; letter-spacing: 0; }
+      .meta p { margin-top: -2px; font-size: 13.5px; }
+      .meta.status-draft { --meta-dot: #8a8f9e; --meta-border: #e0e4ec; --meta-glow: rgba(138, 143, 158, .12); }
+      .meta.status-sent { --meta-dot: #3730a3; --meta-border: #dddafe; --meta-glow: rgba(55, 48, 163, .13); }
+      .meta.status-pending { --meta-dot: #d97706; --meta-border: #fde68a; --meta-glow: rgba(217, 119, 6, .16); }
+      .meta.status-approved { --meta-dot: #059669; --meta-border: #cdeee5; --meta-glow: rgba(5, 150, 105, .14); }
+      .meta.status-rejected { --meta-dot: #dc2626; --meta-border: #fecaca; --meta-glow: rgba(220, 38, 38, .13); }
       .reference-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px 28px; border-bottom: 1px solid #e5e7eb; padding: 12px 0; color: #64748b; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
       .reference-row span:first-child { margin-right: auto; }
       .intro { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: end; border-bottom: 1px solid #e5e7eb; margin-top: 28px; padding: 0 0 24px; background: transparent; }
@@ -272,7 +284,12 @@ export function buildQuotationHtml(quote, settings) {
       .summary { max-width: 320px; margin-left: auto; margin-top: 14px; }
       .row { display: flex; justify-content: space-between; padding: 6px 0; color: #475569; }
       .total { border: 1px solid #efe1bd; border-radius: 8px; margin-top: 8px; padding: 14px; background: #f6f1e8; font-family: "Manrope", Arial, sans-serif; font-size: 20px; font-weight: 800; color: #b45309; }
-      .badge { display: inline-block; border-radius: 999px; padding: 6px 10px; color: #3730a3; background: #f3f4f6; font-size: 12.5px; font-weight: 800; }
+      .badge { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: fit-content; min-height: 28px; border-radius: 999px; padding: 0 12px; color: #475569; background: #eef2f7; font-size: 13px; font-weight: 850; white-space: nowrap; }
+      .badge-icon { display: inline-grid; place-items: center; width: 14px; height: 14px; border: 1.5px solid currentColor; border-radius: 999px; font-size: 10px; line-height: 1; }
+      .status-sent .badge { color: #3730a3; background: #eef2ff; }
+      .status-pending .badge { color: #b45309; background: #fef3c7; }
+      .status-approved .badge { color: #059669; background: #d1fae5; }
+      .status-rejected .badge { color: #dc2626; background: #fee2e2; }
       .footer { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; border-top: 1px solid #e5e7eb; margin-top: 30px; padding-top: 20px; }
       .footer .box h3 { margin-top: 0; }
       .detail-list { display: grid; gap: 12px; margin: 0; }
@@ -316,7 +333,7 @@ export function buildQuotationHtml(quote, settings) {
           <span class="label">Quotation</span>
           <h2>${escapeHtml(quote.quotationNumber)}</h2>
           <p>Issued ${formatDate(quote.createdAt)}</p>
-          <span class="badge">${escapeHtml(quote.status)}</span>
+          <span class="badge"><span class="badge-icon">${escapeHtml(statusIconText(quote.status))}</span>${escapeHtml(quote.status)}</span>
         </div>
       </section>
       <div class="reference-row">
