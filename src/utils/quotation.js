@@ -387,43 +387,6 @@ function safeDownloadName(value) {
     .toLowerCase()
 }
 
-export async function downloadQuotationElementPdf(documentElement, quotationNumber = 'quotely') {
-  if (!documentElement) {
-    throw new Error('Could not find the quotation preview to export.')
-  }
-
-  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-    import('html2canvas'),
-    import('jspdf'),
-  ])
-
-  await document.fonts?.ready
-
-  const bounds = documentElement.getBoundingClientRect()
-  const pagePixelWidth = Math.ceil(bounds.width || documentElement.scrollWidth)
-  const pagePixelHeight = Math.ceil(Math.max(bounds.height, documentElement.scrollHeight))
-  const canvas = await html2canvas(documentElement, {
-    backgroundColor: null,
-    scale: Math.min(window.devicePixelRatio || 2, 2),
-    useCORS: true,
-    width: pagePixelWidth,
-    height: pagePixelHeight,
-    windowHeight: Math.max(window.innerHeight || 0, pagePixelHeight),
-    windowWidth: Math.max(window.innerWidth || 0, pagePixelWidth),
-  })
-
-  const pdf = new jsPDF({
-    format: [pagePixelWidth, pagePixelHeight],
-    orientation: 'portrait',
-    unit: 'px',
-  })
-  const imageData = canvas.toDataURL('image/png', 1)
-
-  pdf.addImage(imageData, 'PNG', 0, 0, pagePixelWidth, pagePixelHeight, undefined, 'FAST')
-
-  pdf.save(`${safeDownloadName(quotationNumber)}-quotation.pdf`)
-}
-
 function waitForFrameLoad(frame) {
   return new Promise((resolve, reject) => {
     const timeout = window.setTimeout(() => {
@@ -442,6 +405,10 @@ function waitForFrameLoad(frame) {
 }
 
 export async function downloadQuotationPdf(quote, settings) {
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+    import('html2canvas'),
+    import('jspdf'),
+  ])
   const html = buildQuotationHtml(quote, settings)
   const frame = document.createElement('iframe')
 
@@ -476,7 +443,50 @@ export async function downloadQuotationPdf(quote, settings) {
     )
     frame.style.height = `${Math.ceil(documentHeight + 80)}px`
 
-    await downloadQuotationElementPdf(documentNode, quote.quotationNumber)
+    const canvas = await html2canvas(documentNode, {
+      backgroundColor: '#fffbf3',
+      scale: Math.min(window.devicePixelRatio || 2, 2),
+      useCORS: true,
+      windowHeight: Math.ceil(documentHeight + 80),
+      windowWidth: 980,
+    })
+
+    const pdf = new jsPDF({
+      format: 'a4',
+      orientation: 'portrait',
+      unit: 'mm',
+    })
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 10
+    const imageWidth = pageWidth - margin * 2
+    const imageHeight = (canvas.height * imageWidth) / canvas.width
+    const contentHeight = pageHeight - margin * 2
+    const imageData = canvas.toDataURL('image/png', 1)
+    let heightLeft = imageHeight
+    let pageIndex = 0
+
+    while (heightLeft > 0) {
+      if (pageIndex > 0) {
+        pdf.addPage()
+      }
+
+      pdf.addImage(
+        imageData,
+        'PNG',
+        margin,
+        margin - pageIndex * contentHeight,
+        imageWidth,
+        imageHeight,
+        undefined,
+        'FAST',
+      )
+
+      heightLeft -= contentHeight
+      pageIndex += 1
+    }
+
+    pdf.save(`${safeDownloadName(quote.quotationNumber)}-quotation.pdf`)
   } finally {
     frame.remove()
   }

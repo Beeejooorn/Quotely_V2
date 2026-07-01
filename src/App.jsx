@@ -32,7 +32,7 @@ import {
 import {
   calculateQuote,
   createBlankQuote,
-  downloadQuotationElementPdf,
+  downloadQuotationPdf,
   formatMoney,
   nextQuoteNumber,
   normalizeMoney,
@@ -240,9 +240,7 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
   const [selectedQuoteId, setSelectedQuoteId] = useState(null)
   const [quoteErrors, setQuoteErrors] = useState({})
   const [isRemoteWorkspaceReady, setIsRemoteWorkspaceReady] = useState(false)
-  const [pdfQuote, setPdfQuote] = useState(null)
   const settingsFeedbackRef = useRef(null)
-  const pdfRequestRef = useRef(null)
   const remoteSyncFeedbackRef = useRef(false)
   const showFeedbackRef = useRef(showFeedback)
   const [draftQuote, setDraftQuote] = useState(() =>
@@ -573,57 +571,9 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
     }, 650)
   }
 
-  useEffect(() => {
-    if (!pdfQuote || !pdfRequestRef.current) {
-      return undefined
-    }
-
-    let isCancelled = false
-    const frameId = window.requestAnimationFrame(async () => {
-      try {
-        await document.fonts?.ready
-
-        if (isCancelled) {
-          return
-        }
-
-        const documentElement = document.getElementById('pdf-print-document')
-
-        await downloadQuotationElementPdf(documentElement, pdfQuote.quotationNumber)
-        pdfRequestRef.current?.resolve()
-      } catch (error) {
-        pdfRequestRef.current?.reject(error)
-      } finally {
-        pdfRequestRef.current = null
-        setPdfQuote(null)
-      }
-    })
-
-    return () => {
-      isCancelled = true
-      window.cancelAnimationFrame(frameId)
-    }
-  }, [pdfQuote])
-
-  const downloadRenderedQuotePdf = async (quote, documentElement) => {
-    try {
-      await downloadQuotationElementPdf(documentElement, quote.quotationNumber)
-      showFeedback('Quotation downloaded', `${quote.quotationNumber} was saved as a PDF file.`)
-    } catch (error) {
-      showFeedback(
-        'Download failed',
-        error?.message || 'Could not create the quotation PDF. Try printing to PDF instead.',
-        'error',
-      )
-    }
-  }
-
   const downloadQuotePdf = async (quote) => {
     try {
-      await new Promise((resolve, reject) => {
-        pdfRequestRef.current = { resolve, reject }
-        setPdfQuote(quote)
-      })
+      await downloadQuotationPdf(quote, settings)
       showFeedback('Quotation downloaded', `${quote.quotationNumber} was saved as a PDF file.`)
     } catch (error) {
       showFeedback(
@@ -635,7 +585,7 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
   }
 
   const downloadQuote = () => {
-    downloadRenderedQuotePdf(draftQuote, document.getElementById('print-document'))
+    downloadQuotePdf(draftQuote)
   }
 
   const printQuote = () => {
@@ -882,20 +832,6 @@ function SecureWorkspace({ account, onLogout, showFeedback }) {
       profileImage={profileImage}
     >
       {renderSection()}
-      {pdfQuote && (
-        <div className="pdf-export-host" aria-hidden="true">
-          <QuotePreview
-            documentId="pdf-print-document"
-            headingId="pdf-preview-heading"
-            panelId="pdf-quote-preview-panel"
-            helperText="Preparing PDF export."
-            quote={pdfQuote}
-            settings={settings}
-            showActions={false}
-            totals={calculateQuote(pdfQuote)}
-          />
-        </div>
-      )}
     </AppShell>
   )
 }
